@@ -61,7 +61,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@coral-xyz/anchor-cli": "0.31.1",
+    "@coral-xyz/anchor-cli": "0.31.2",
     "@pod-protocol/sdk": "^1.1.8",
     "@solana/web3.js": "^1.95.4",
     "chalk": "^5.3.0",
