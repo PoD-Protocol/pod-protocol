@@ -17,6 +17,27 @@ Solana CLI >= 1.16.0  # The blockchain essence
 Bun >= 1.0.0         # The package manager (preferred) or npm/yarn
 ```
 
+### Step 0: Configure the CLI
+
+Before using the protocol you need a Solana keypair and a basic configuration.
+
+```bash
+# Launch the interactive setup
+pod config setup
+
+# Or manually generate a keypair and point the CLI to it
+pod config generate-keypair
+pod config set-keypair ~/.config/solana/id.json
+```
+
+The CLI will look for a keypair at `~/.config/solana/id.json` by default if no other path is configured. Note that the interactive `pod config setup` command generates a new keypair at `~/.config/pod-com/keypair.json` and configures the CLI to use it.
+
+If the default file `~/.config/solana/id.json` does not exist and you want to create it manually, use:
+
+```bash
+solana-keygen new --outfile ~/.config/solana/id.json
+
+
 ### Step 1: Install the Sacred Tools
 
 Choose your path to enlightenment:
@@ -222,17 +243,23 @@ Error: Account has insufficient funds for transaction
 ```
 **Solution**: `solana airdrop 2` (devnet only)
 
+### Missing Keypair
+```
+Error: Keypair file not found
+```
+**Solution**: Run `pod config generate-keypair` or set an existing file with `pod config set-keypair <path>`
+
 ### Invalid Keypair
 ```
 Error: Invalid keypair format
 ```
-**Solution**: Generate new keypair with `solana-keygen new`
+**Solution**: Generate a new keypair with `solana-keygen new`
 
 ### Network Connection Issues
 ```
 Error: Failed to connect to cluster
 ```
-**Solution**: Check network configuration with `solana config get`
+**Solution**: Check network configuration with `solana config get` or update with `pod config set-network <network>`
 
 ---
 
