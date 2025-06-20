@@ -47,6 +47,7 @@ async function runCommand(cmd: string, globalOpts: string) {
       stdout: error.stdout ?? "",
       stderr: error.signal === 'SIGTERM' ? 'Command timed out' : error.stderr ?? error.message,
     };
+  }
 }
 
 async function main() {
