@@ -178,8 +178,9 @@ console.log(`Running ${specs.length} command groups...`);
 const MAX_CONCURRENT = 5;
 for (const spec of specs) {
   const combos = combinations(spec.options);
-  console.log(`Testing "${spec.base}" with ${combos.length} option combinations...`);
-  
+  // Process in batches for controlled concurrency
+  let completed = 0; // Initialize completed counter
+  for (let i = 0; i < combos.length; i += MAX_CONCURRENT) {
   // Process in batches for controlled concurrency
   for (let i = 0; i < combos.length; i += MAX_CONCURRENT) {
     const batch = combos.slice(i, i + MAX_CONCURRENT);
