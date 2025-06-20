@@ -43,11 +43,10 @@ async function runCommand(cmd: string, globalOpts: string) {
     return { exitCode: 0, stdout, stderr };
   } catch (error: any) {
     return {
-      exitCode: error.code ?? 1,
+      exitCode: error.signal === 'SIGTERM' ? 124 : error.code ?? 1,
       stdout: error.stdout ?? "",
-      stderr: error.stderr ?? error.message,
+      stderr: error.signal === 'SIGTERM' ? 'Command timed out' : error.stderr ?? error.message,
     };
-  }
 }
 
 async function main() {
