@@ -69,7 +69,11 @@ async function main() {
     `--network devnet ${keypair ? `--keypair ${keypair}` : ""}`.trim();
 
   if (endpoint) {
-    await runCommand(`config set-endpoint ${endpoint}`, globalOpts);
+    const result = await runCommand(`config set-endpoint ${endpoint}`, globalOpts);
+    if (result.exitCode !== 0) {
+      console.error(`Failed to set endpoint: ${result.stderr}`);
+      process.exit(1);
+    }
   }
 
   const specs: CommandSpec[] = [
