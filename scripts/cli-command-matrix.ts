@@ -190,9 +190,7 @@ for (const spec of specs) {
       completed++;
       if (completed % 10 === 0) {
         console.log(`Progress: ${completed} commands completed`);
-      }
-    });
-    await Promise.all(promises);
+  }
   }
     }
   }
