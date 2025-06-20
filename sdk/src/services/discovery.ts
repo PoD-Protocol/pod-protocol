@@ -315,7 +315,7 @@ export class DiscoveryService extends BaseService {
     
     const recommendations: Recommendation<AgentAccount>[] = agents.items.map(agent => {
       let score = 0;
-      let reasons: string[] = [];
+      const reasons: string[] = [];
 
       // Score based on reputation
       score += Math.min(agent.reputation / 100, 1) * 0.3;
@@ -362,7 +362,7 @@ export class DiscoveryService extends BaseService {
     
     const recommendations: Recommendation<ChannelAccount>[] = channels.items.map(channel => {
       let score = 0;
-      let reasons: string[] = [];
+      const reasons: string[] = [];
 
       // Score based on participant count
       const participantRatio = channel.participantCount / channel.maxParticipants;
