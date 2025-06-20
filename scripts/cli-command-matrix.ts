@@ -172,19 +172,26 @@ async function main() {
 
   const results: Array<{ command: string; exit: number }> = [];
 console.log(`Running ${specs.length} command groups...`);
-let completed = 0;
-
+// Process commands with controlled concurrency
+const MAX_CONCURRENT = 5;
 for (const spec of specs) {
   const combos = combinations(spec.options);
   console.log(`Testing "${spec.base}" with ${combos.length} option combinations...`);
   
-  for (const combo of combos) {
-    const cmd = `${spec.base} ${combo.join(" ")}`.trim();
-    const res = await runCommand(cmd, globalOpts);
-    results.push({ command: cmd, exit: res.exitCode });
-    completed++;
-    if (completed % 10 === 0) {
-      console.log(`Progress: ${completed} commands completed`);
+  // Process in batches for controlled concurrency
+  for (let i = 0; i < combos.length; i += MAX_CONCURRENT) {
+    const batch = combos.slice(i, i + MAX_CONCURRENT);
+    const promises = batch.map(async (combo) => {
+      const cmd = `${spec.base} ${combo.join(" ")}`.trim();
+      const res = await runCommand(cmd, globalOpts);
+      results.push({ command: cmd, exit: res.exitCode });
+      completed++;
+      if (completed % 10 === 0) {
+        console.log(`Progress: ${completed} commands completed`);
+      }
+    });
+    await Promise.all(promises);
+  }
     }
   }
 }
