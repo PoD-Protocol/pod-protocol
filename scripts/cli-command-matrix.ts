@@ -165,9 +165,10 @@ async function main() {
   ];
 
   const results: Array<{ command: string; exit: number }> = [];
+console.log(`Running ${specs.length} command groups...`);
+let completed = 0;
 
-  for (const spec of specs) {
-    console.log(`Running ${specs.length} command groups...`);
+for (const spec of specs) {
     let completed = 0;
 
     for (const spec of specs) {
