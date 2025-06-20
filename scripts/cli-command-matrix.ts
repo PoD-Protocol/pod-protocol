@@ -166,13 +166,22 @@ async function main() {
   const results: Array<{ command: string; exit: number }> = [];
 
   for (const spec of specs) {
-    const combos = combinations(spec.options);
-    for (const combo of combos) {
-      const cmd = `${spec.base} ${combo.join(" ")}`.trim();
-      const res = await runCommand(cmd, globalOpts);
-      results.push({ command: cmd, exit: res.exitCode });
-    }
-  }
+    console.log(`Running ${specs.length} command groups...`);
+    let completed = 0;
+
+    for (const spec of specs) {
+      const combos = combinations(spec.options);
+      console.log(`Testing "${spec.base}" with ${combos.length} option combinations...`);
+  
+      for (const combo of combos) {
+        const cmd = `${spec.base} ${combo.join(" ")}`.trim();
+        const res = await runCommand(cmd, globalOpts);
+        results.push({ command: cmd, exit: res.exitCode });
+        completed++;
+        if (completed % 10 === 0) {
+          console.log(`Progress: ${completed} commands completed`);
+        }
+      }
 
   if (endpoint) {
     await runCommand("config clear-endpoint", globalOpts);
