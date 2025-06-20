@@ -40,3 +40,10 @@ const isValidUri = (uri: string): boolean => {
     return false;
   }
 };
+
+export const AgentValidators = {
+  validateAgentAddress,
+  validateCapabilities,
+  validateMetadataUri,
+  validateLimit,
+};

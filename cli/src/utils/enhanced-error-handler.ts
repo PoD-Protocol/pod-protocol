@@ -99,13 +99,15 @@ export class PodError extends Error {
     this.suggestions = details.suggestions;
     this.technicalDetails = details.technicalDetails;
     this.documentationUrl = details.documentationUrl;
+
   }
+
 }
 
 /**
  * Predefined error templates for common issues
  */
-export const ERROR_TEMPLATES: Record<ErrorCode, Omit<ErrorDetails, 'code'>> = {
+export const ERROR_TEMPLATES: Partial<Record<ErrorCode, Omit<ErrorDetails, 'code'>>> = {
   [ErrorCode.NETWORK_CONNECTION_FAILED]: {
     title: 'Network Connection Failed',
     message: 'Unable to connect to the Solana network',
@@ -214,23 +216,11 @@ export const ERROR_TEMPLATES: Record<ErrorCode, Omit<ErrorDetails, 'code'>> = {
   },
 
   // Add more error templates as needed...
-} as const satisfies Record<ErrorCode, Omit<ErrorDetails, 'code'>>;
+} as const satisfies Partial<Record<ErrorCode, Omit<ErrorDetails, 'code'>>>;
 
 /**
  * Enhanced error handler with rich formatting and suggestions
  */
-export class EnhancedErrorHandler {
-  private verbose: boolean = false;
-  private debugMode: boolean = false;
-
-  constructor(options: { verbose?: boolean; debug?: boolean } = {}) {
-    this.verbose = options.verbose || false;
-    this.debugMode = options.debug || false;
-  }
-
-  /**
-   * Handle and display a PodError with full formatting
-   */
 export class EnhancedErrorHandler {
   private verbose: boolean = false;
   private debugMode: boolean = false;
@@ -253,7 +243,6 @@ export class EnhancedErrorHandler {
       process.exit(1);
     }
   }
-}
 
   /**
    * Display a formatted PodError

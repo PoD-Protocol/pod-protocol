@@ -1,5 +1,6 @@
 import { PodComClient, MessageType, MessageStatus } from "@pod-protocol/sdk";
 import { GlobalOptions } from "../../utils/shared.js";
+import { Keypair } from "@solana/web3.js";
 
 export interface CommandContext {
   client: PodComClient;
