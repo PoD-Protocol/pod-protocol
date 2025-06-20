@@ -168,9 +168,6 @@ async function main() {
 console.log(`Running ${specs.length} command groups...`);
 let completed = 0;
 
-console.log(`Running ${specs.length} command groups...`);
-let completed = 0;
-
 for (const spec of specs) {
   const combos = combinations(spec.options);
   console.log(`Testing "${spec.base}" with ${combos.length} option combinations...`);
