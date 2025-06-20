@@ -174,16 +174,16 @@ for (const spec of specs) {
   
       for (const combo of combos) {
         const cmd = `${spec.base} ${combo.join(" ")}`.trim();
-        const res = await runCommand(cmd, globalOpts);
-        results.push({ command: cmd, exit: res.exitCode });
-        completed++;
-        if (completed % 10 === 0) {
-          console.log(`Progress: ${completed} commands completed`);
-        }
+  
+    for (const combo of combos) {
+      const cmd = `${spec.base} ${combo.join(" ")}`.trim();
+      const res = await runCommand(cmd, globalOpts);
+      results.push({ command: cmd, exit: res.exitCode });
+      completed++;
+      if (completed % 10 === 0) {
+        console.log(`Progress: ${completed} commands completed`);
       }
-
-  if (endpoint) {
-    await runCommand("config clear-endpoint", globalOpts);
+    }
   }
 
   const data = [["Command", "Exit", "Result"]];
