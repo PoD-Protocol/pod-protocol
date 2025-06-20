@@ -36,8 +36,10 @@ function combinations(opts: string[]): string[][] {
 
 async function runCommand(cmd: string, globalOpts: string) {
   try {
+    // Split into arguments to avoid command injection
+    const args = [...globalOpts.split(' ').filter(Boolean), ...cmd.split(' ').filter(Boolean)];
     const { stdout, stderr } = await execAsync(
-      `node cli/dist/index.js ${globalOpts} ${cmd}`,
+      `node cli/dist/index.js ${args.map(arg => `"${arg.replace(/"/g, '\\"')}"`).join(' ')}`,
       { timeout: 30000 },
     );
     return { exitCode: 0, stdout, stderr };
