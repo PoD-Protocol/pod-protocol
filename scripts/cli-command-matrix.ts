@@ -75,9 +75,6 @@ if (endpoint && endpoint.trim()) {
   if (result.exitCode !== 0) {
     console.error(`Failed to set endpoint: ${result.stderr}`);
     process.exit(1);
-  }
-}
-      process.exit(1);
     }
   }
 
