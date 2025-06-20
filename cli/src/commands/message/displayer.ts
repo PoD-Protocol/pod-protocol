@@ -50,7 +50,7 @@ export class MessageDisplayer {
   }
 
   public displayMessagesList(messages: MessageData[]): void {
-    const data = messages.map((msg) => [
+    const data = messages.map((msg: MessageData) => [
       formatValue(msg.pubkey.toBase58().slice(0, 8) + "...", "address"),
       formatValue(msg.sender.toBase58().slice(0, 8) + "...", "address"),
       formatValue(msg.recipient.toBase58().slice(0, 8) + "...", "address"),
