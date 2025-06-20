@@ -20,5 +20,6 @@ for (const cmd of commands) {
   } catch (err) {
     console.error(`Command failed: ${cmd}`);
     console.error(err.message);
+    process.exit(1);
   }
 }
