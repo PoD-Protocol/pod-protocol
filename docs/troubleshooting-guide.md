@@ -31,7 +31,7 @@ If the token is incorrect or missing the analysis step will fail with an "unauth
 Large artifacts or caches can fill the runner's disk. If you see "No space left on device" errors, add cleanup steps or reduce artifact size. Using `actions/cache` with a `max-size` limit can prevent overuse.
 
 #### Test Flakiness
-- Rerun failed jobs with "Run workflow" to confirm if failures are transient.
+- Rerun failed jobs using the **Run workflow** button/option in the GitHub Actions UI to confirm if failures are transient.
 - Check that tests do not rely on external services without retries.
 - Consider running problematic tests in debug mode using `tmate` for interactive troubleshooting.
 
