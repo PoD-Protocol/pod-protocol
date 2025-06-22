@@ -94,7 +94,7 @@ export interface Recommendation<T> {
 }
 
 export class DiscoveryService extends BaseService {
-  private pool = new Pool({ connectionString: process.env.PHOTON_DB_URL });
+  private pool = new Pool({ connectionString: process.env.PHOTON_DB_URL || "postgresql://user:password@host:port/database" }); // Provide a default or throw error
   /**
    * Search for agents with advanced filtering
    */
