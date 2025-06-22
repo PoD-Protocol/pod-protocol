@@ -181,8 +181,12 @@ export interface PodComConfig {
   };
   /** ZK Compression configuration for Light Protocol integration */
   zkCompression?: {
-    /** Light Protocol RPC endpoint */
+    /** Light Protocol Solana RPC endpoint */
     lightRpcUrl?: string;
+    /** Light Protocol compression RPC endpoint */
+    compressionRpcUrl?: string;
+    /** Light Protocol prover endpoint */
+    proverUrl?: string;
     /** Photon indexer endpoint */
     photonIndexerUrl?: string;
     /** Maximum batch size for compression operations */
