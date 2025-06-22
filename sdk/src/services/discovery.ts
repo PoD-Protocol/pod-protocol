@@ -1,5 +1,6 @@
 import { PublicKey, GetProgramAccountsFilter } from "@solana/web3.js";
 import { BaseService } from "./base";
+import { Pool } from "pg";
 import {
   AgentAccount,
   MessageAccount,
@@ -17,6 +18,17 @@ import {
   getAccountCreatedAt,
   getAccountLastUpdated,
 } from "../utils";
+
+const db = new Pool({ connectionString: process.env.PHOTON_DB_URL });
+
+export function filterByCapabilities<T extends { capabilities: string[] }>(
+  items: T[],
+  required: string[],
+): T[] {
+  return items.filter((i) =>
+    required.every((r) => i.capabilities.includes(r)),
+  );
+}
 
 /**
  * Search and discovery service for finding agents, channels, and messages
@@ -100,10 +112,9 @@ export class DiscoveryService extends BaseService {
         },
       ];
 
-      // Add capability filters
+      // Add capability filters (post-query)
       if (filters.capabilities && filters.capabilities.length > 0) {
-        // This would need to be implemented based on how capabilities are stored
-        // For now, we'll filter in memory after fetching
+        // Filtering handled after fetching accounts
       }
 
       const accounts = await this.connection.getProgramAccounts(
@@ -128,6 +139,15 @@ export class DiscoveryService extends BaseService {
           bump: account.bump,
         };
       });
+
+      if (filters.capabilities && filters.capabilities.length > 0) {
+        const required = filters.capabilities.map((c) => c.toString());
+        const wrapped = agents.map((a) => ({
+          original: a,
+          capabilities: getCapabilityNames(a.capabilities),
+        }));
+        agents = filterByCapabilities(wrapped, required).map((w) => w.original);
+      }
 
       // Apply in-memory filters
       agents = this.applyAgentFilters(agents, filters);
@@ -821,4 +841,14 @@ export class DiscoveryService extends BaseService {
       return ChannelVisibility.Private;
     return ChannelVisibility.Public;
   }
+}
+
+export async function getChannelParticipants(
+  channelId: string,
+): Promise<string[]> {
+  const result = await db.query(
+    'SELECT participant_pubkey FROM channel_participants_index WHERE channel_id = $1',
+    [channelId],
+  );
+  return result.rows.map((r) => r.participant_pubkey);
 }

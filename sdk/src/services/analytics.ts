@@ -1,6 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
 import { BaseService } from "./base";
+import { InfluxDB } from "@influxdata/influxdb-client";
+import { AnchorProvider, Program, utils } from "@coral-xyz/anchor";
+import idl from "../pod_com.json" assert { type: "json" };
 import {
+  PROGRAM_ID,
   AgentAccount,
   MessageAccount,
   ChannelAccount,
@@ -15,6 +19,24 @@ import {
   getCapabilityNames,
   hasCapability,
 } from "../utils";
+
+const provider = AnchorProvider.env();
+const program = new Program(idl as any, PROGRAM_ID, provider);
+const discoMap: Record<string, string> = {};
+if (Array.isArray((idl as any).accounts)) {
+  for (const acc of (idl as any).accounts) {
+    discoMap[acc.name] = utils.bytes.bs58.encode(
+      utils.accountDiscriminator(acc.name),
+    );
+  }
+}
+
+const influx = new InfluxDB({
+  url: process.env.INFLUX_URL || "",
+  token: process.env.INFLUX_TOKEN || "",
+});
+const influxOrg = process.env.INFLUX_ORG || "";
+const influxBucket = process.env.INFLUX_BUCKET || "";
 
 /**
  * Analytics and insights for agent activities, message patterns, and channel usage
@@ -405,9 +427,9 @@ export class AnalyticsService extends BaseService {
         }
       }, 0);
 
-      // Mock data for metrics that require historical tracking
-      // In a real implementation, these would be stored in a time-series database
-      const peakUsageHours = [9, 10, 11, 14, 15, 16, 20, 21]; // 9-11am, 2-4pm, 8-9pm UTC
+      const start = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const stop = new Date().toISOString();
+      const peakUsageHours = await this.getPeakUsage(start, stop);
 
       return {
         totalTransactions: recentSlots.reduce(
@@ -479,14 +501,24 @@ export class AnalyticsService extends BaseService {
   // ============================================================================
 
   private getDiscriminator(accountType: string): string {
-    // This would need to be implemented based on your IDL
-    const discriminators: Record<string, string> = {
-      agentAccount: "6RdcqmKGhkRy",
-      messageAccount: "6RdcqmKGhkRz",
-      channelAccount: "6RdcqmKGhkRA",
-      escrowAccount: "6RdcqmKGhkRB",
-    };
-    return discriminators[accountType] || "";
+    return discoMap[accountType] || "";
+  }
+
+  private async getPeakUsage(start: string, stop: string): Promise<number[]> {
+    const queryApi = influx.getQueryApi(influxOrg);
+    const query = `from(bucket: "${influxBucket}") |> range(start: time(v:"${start}"), stop: time(v:"${stop}")) |> aggregateWindow(every: 1h, fn: count)`;
+    const peaks: number[] = [];
+    await new Promise<void>((resolve, reject) => {
+      queryApi.queryRows(query, {
+        next: (row: string[], tableMeta: any) => {
+          const o = tableMeta.toObject(row);
+          peaks.push(new Date(o._time).getUTCHours());
+        },
+        error: reject,
+        complete: () => resolve(),
+      });
+    });
+    return peaks;
   }
 
   private convertMessageTypeFromProgram(programType: any): any {
