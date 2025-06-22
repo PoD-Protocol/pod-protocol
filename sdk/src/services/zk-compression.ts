@@ -3,18 +3,30 @@ import { AnchorProvider } from '@coral-xyz/anchor';
 import { BaseService, BaseServiceConfig } from './base.js';
 import { IPFSService, IPFSStorageResult } from './ipfs.js';
 
+import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
+import { createMint, mintTo, transfer } from '@lightprotocol/compressed-token';
+
 /**
- * Light Protocol SDK types (placeholder - would be from actual light-protocol-sdk)
+ * Compressed account information returned by Light Protocol
  */
-interface CompressedAccount {
+export interface CompressedAccount {
+  /** Address of the compressed account */
   hash: string;
+  /** Associated message data */
   data: any;
+  /** Merkle context or proof data */
   merkleContext?: any;
 }
 
-interface BatchCompressionResult {
+/**
+ * Result of a batch compression operation
+ */
+export interface BatchCompressionResult {
+  /** Transaction signature */
   signature: string;
+  /** List of compressed accounts created in batch */
   compressedAccounts: CompressedAccount[];
+  /** Merkle root after batch compression */
   merkleRoot: string;
 }
 
@@ -22,8 +34,12 @@ interface BatchCompressionResult {
  * ZK Compression configuration
  */
 export interface ZKCompressionConfig {
-  /** Light Protocol RPC endpoint */
+  /** Light Protocol Solana RPC endpoint */
   lightRpcUrl?: string;
+  /** Light Protocol compression RPC endpoint */
+  compressionRpcUrl?: string;
+  /** Light Protocol prover endpoint */
+  proverUrl?: string;
   /** Photon indexer endpoint */
   photonIndexerUrl?: string;
   /** Maximum batch size for compression operations */
@@ -75,6 +91,7 @@ export interface BatchSyncOperation {
  */
 export class ZKCompressionService extends BaseService {
   private config: ZKCompressionConfig;
+  private rpc: Rpc;
   private ipfsService: IPFSService;
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
@@ -88,12 +105,20 @@ export class ZKCompressionService extends BaseService {
     
     this.config = {
       lightRpcUrl: zkConfig.lightRpcUrl || 'https://devnet.helius-rpc.com/?api-key=<your-api-key>',
+      compressionRpcUrl: zkConfig.compressionRpcUrl || process.env.LIGHT_COMPRESSION_RPC_URL || '',
+      proverUrl: zkConfig.proverUrl || process.env.LIGHT_PROVER_URL || '',
       photonIndexerUrl: zkConfig.photonIndexerUrl || 'http://localhost:8080',
       maxBatchSize: zkConfig.maxBatchSize || 50,
       enableBatching: zkConfig.enableBatching ?? true,
       batchTimeout: zkConfig.batchTimeout || 5000,
       ...zkConfig,
     };
+
+    this.rpc = createRpc(
+      this.config.lightRpcUrl!,
+      this.config.compressionRpcUrl!,
+      this.config.proverUrl!
+    );
 
     this.ipfsService = ipfsService;
 
@@ -154,8 +179,27 @@ export class ZKCompressionService extends BaseService {
           compressedAccount: { hash: '', data: compressedMessage },
         };
       } else {
-        // Process immediately
-        return await this.processCompressedMessage(compressedMessage, ipfsResult);
+        // Execute compression via Light Protocol RPC
+        const rpcResult = await this.rpc.compress({
+          merkleTree: channelId.toString(),
+          message: {
+            contentHash,
+            ipfsHash: ipfsResult.hash,
+            messageType,
+            createdAt: compressedMessage.createdAt,
+            replyTo: replyTo?.toString() || null,
+          },
+        });
+
+        return {
+          signature: rpcResult.signature,
+          ipfsResult,
+          compressedAccount: {
+            hash: rpcResult.compressedAccount,
+            data: compressedMessage,
+            merkleContext: rpcResult.merkleContext,
+          },
+        };
       }
     } catch (error) {
       throw new Error(`Failed to broadcast compressed message: ${error}`);
@@ -275,32 +319,43 @@ export class ZKCompressionService extends BaseService {
     } = {}
   ): Promise<CompressedChannelMessage[]> {
     try {
-      const queryParams = new URLSearchParams({
-        channel: channelId.toString(),
-        limit: (options.limit || 50).toString(),
-        offset: (options.offset || 0).toString(),
+      // Query compressed messages via Photon indexer JSON-RPC
+      const rpcReq = {
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'getCompressedMessagesByChannel',
+        params: [
+          channelId.toString(),
+          options.limit ?? 50,
+          options.offset ?? 0,
+          options.sender?.toString() || null,
+          options.after?.getTime() || null,
+          options.before?.getTime() || null,
+        ],
+      };
+      const response = await fetch(this.config.photonIndexerUrl!, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rpcReq),
       });
-
-      if (options.sender) {
-        queryParams.append('sender', options.sender.toString());
-      }
-      if (options.after) {
-        queryParams.append('after', options.after.getTime().toString());
-      }
-      if (options.before) {
-        queryParams.append('before', options.before.getTime().toString());
-      }
-
-      const response = await fetch(
-        `${this.config.photonIndexerUrl}/compressed-messages?${queryParams}`
-      );
-
       if (!response.ok) {
-        throw new Error(`Indexer query failed: ${response.statusText}`);
+        throw new Error(`Indexer RPC failed: ${response.statusText}`);
       }
-
-      const data = await response.json() as any;
-      return data.messages || [];
+      const json = await response.json();
+      if (json.error) {
+        throw new Error(`Indexer RPC error: ${json.error.message}`);
+      }
+      const raw = (json.result as any[]) || [];
+      return raw.map(m => ({
+        channel: new PublicKey(m.channel),
+        sender: new PublicKey(m.sender),
+        contentHash: m.content_hash,
+        ipfsHash: m.ipfs_hash,
+        messageType: m.message_type,
+        createdAt: m.created_at,
+        editedAt: m.edited_at,
+        replyTo: m.reply_to ? new PublicKey(m.reply_to) : undefined,
+      }));
     } catch (error) {
       throw new Error(`Failed to query compressed messages: ${error}`);
     }
@@ -436,11 +491,25 @@ export class ZKCompressionService extends BaseService {
     // Process batch using Light Protocol's batch compression
     // This would involve creating a batch transaction with multiple compressed accounts
     
-    // Placeholder implementation
+    // Execute batch compression via Light Protocol RPC
+    const rpcResult = await this.rpc.batchCompress({
+      merkleTree: batch[0].channel.toString(),
+      messages: batch.map(msg => ({
+        contentHash: msg.contentHash,
+        ipfsHash: msg.ipfsHash,
+        messageType: msg.messageType,
+        createdAt: msg.createdAt,
+        replyTo: msg.replyTo?.toString() || null,
+      })),
+    });
     return {
-      signature: 'batch-processed',
-      batchSize: batch.length,
-      compressedAccounts: batch.map(msg => ({ hash: '', data: msg })),
+      signature: rpcResult.signature,
+      compressedAccounts: rpcResult.compressedAccounts.map((hash: string, idx: number) => ({
+        hash,
+        data: batch[idx],
+        merkleContext: rpcResult.merkleContext,
+      })),
+      merkleRoot: rpcResult.merkleRoot,
     };
   }
 

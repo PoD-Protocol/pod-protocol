@@ -1,6 +1,7 @@
 import { create, IPFSHTTPClient } from 'ipfs-http-client';
 import { CID } from 'multiformats/cid';
 import { BaseService, BaseServiceConfig } from './base.js';
+import { createHash } from 'crypto';
 
 /**
  * IPFS configuration options
@@ -268,15 +269,9 @@ export class IPFSService extends BaseService {
    * Create a content hash for verification
    */
   static createContentHash(content: string): string {
-    // This would typically use the same hashing function as the Solana program
-    // For now, using a simple approach - in production, use the same hash function as Rust program
-    const encoder = new TextEncoder();
-    const data = encoder.encode(content);
-    
-    // This should match the hashing used in the Solana program
-    return Array.from(data)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    // Use SHA-256 to match the Rust program's content_hash ([u8; 32])
+    const hash = createHash('sha256').update(content).digest('hex');
+    return hash;
   }
 
   /**
