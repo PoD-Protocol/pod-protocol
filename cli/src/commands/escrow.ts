@@ -212,16 +212,6 @@ export class EscrowCommands {
       lamports: options.lamports,
       all: options.all,
     });
-    const spinner = createSpinner("Depositing to escrow...");
-    if (
-      globalOpts.dryRun &&
-      handleDryRun(globalOpts, spinner, "Escrow deposit", {
-        Channel: channelId,
-        Amount: `${lamportsToSol(amount)} SOL (${amount} lamports)`,
-      })
-    ) {
-      return;
-    }
     const channelKey = validatePublicKey(channelId, "channel ID");
     if (
       handleDryRun(globalOpts, spinner, "Escrow deposit", {
