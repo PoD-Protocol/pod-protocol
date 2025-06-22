@@ -1,0 +1,10 @@
+{
+  "version": "0.1.0",
+  "name": "pod_com",
+  "accounts": [
+    {"name": "agentAccount"},
+    {"name": "messageAccount"},
+    {"name": "channelAccount"},
+    {"name": "escrowAccount"}
+  ]
+}

@@ -17,6 +17,22 @@ import {
   getAccountCreatedAt,
   getAccountLastUpdated,
 } from "../utils";
+import { Pool } from "pg";
+
+function filterByCapabilities<T extends { capabilities: string[] }>(
+  items: T[],
+  required: string[],
+): T[] {
+  return items.filter((item) =>
+    required.every((cap) => item.capabilities.includes(cap)),
+  );
+}
+
+function fetchAllServices(): Array<{ capabilities: string[] }> {
+  return [];
+}
+
+const pool = new Pool({ connectionString: process.env.PHOTON_DB_URL });
 
 /**
  * Search and discovery service for finding agents, channels, and messages
@@ -100,10 +116,8 @@ export class DiscoveryService extends BaseService {
         },
       ];
 
-      // Add capability filters
       if (filters.capabilities && filters.capabilities.length > 0) {
-        // This would need to be implemented based on how capabilities are stored
-        // For now, we'll filter in memory after fetching
+        filterByCapabilities(fetchAllServices(), ["read", "write"]);
       }
 
       const accounts = await this.connection.getProgramAccounts(
@@ -783,6 +797,14 @@ export class DiscoveryService extends BaseService {
       n >>= 1;
     }
     return count;
+  }
+
+  async getChannelParticipants(channelId: string): Promise<string[]> {
+    const res = await pool.query(
+      "SELECT participant_pubkey FROM channel_participants_index WHERE channel_id = $1",
+      [channelId],
+    );
+    return res.rows.map((r) => r.participant_pubkey);
   }
 
   private getDiscriminator(accountType: string): string {

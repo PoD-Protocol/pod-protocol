@@ -7,6 +7,7 @@ import {
   EscrowAccount,
   MessageStatus,
   ChannelVisibility,
+  PROGRAM_ID,
 } from "../types";
 import {
   lamportsToSol,
@@ -15,6 +16,28 @@ import {
   getCapabilityNames,
   hasCapability,
 } from "../utils";
+import { InfluxDB } from "@influxdata/influxdb-client";
+import anchor, { Program, AnchorProvider, utils } from "@coral-xyz/anchor";
+import idl from "../pod_com.json" assert { type: "json" };
+
+const provider = AnchorProvider.env();
+const anchorProgram = new Program(idl as anchor.Idl, PROGRAM_ID, provider);
+const discoMap: Record<string, string> = {};
+if (Array.isArray((idl as any).accounts)) {
+  for (const acc of (idl as any).accounts) {
+    discoMap[acc.name] = utils.bytes.bs58.encode(
+      utils.accountDiscriminator(acc.name),
+    );
+  }
+}
+
+const influx = new InfluxDB({
+  url: process.env.INFLUX_URL || "",
+  token: process.env.INFLUX_TOKEN || "",
+});
+const influxOrg = process.env.INFLUX_ORG || "";
+const influxBucket = process.env.INFLUX_BUCKET || "";
+const queryApi = influx.getQueryApi(influxOrg);
 
 /**
  * Analytics and insights for agent activities, message patterns, and channel usage
@@ -95,7 +118,7 @@ export class AnalyticsService extends BaseService {
           {
             memcmp: {
               offset: 0,
-              bytes: this.getDiscriminator("agentAccount"),
+              bytes: discoMap["agentAccount"],
             },
           },
         ],
@@ -166,12 +189,12 @@ export class AnalyticsService extends BaseService {
         this.programId,
         {
           filters: [
-            {
-              memcmp: {
-                offset: 0,
-                bytes: this.getDiscriminator("messageAccount"),
-              },
+          {
+            memcmp: {
+              offset: 0,
+              bytes: discoMap["messageAccount"],
             },
+          },
           ],
           commitment: this.commitment,
         },
@@ -271,12 +294,12 @@ export class AnalyticsService extends BaseService {
         this.programId,
         {
           filters: [
-            {
-              memcmp: {
-                offset: 0,
-                bytes: this.getDiscriminator("channelAccount"),
-              },
+          {
+            memcmp: {
+              offset: 0,
+              bytes: discoMap["channelAccount"],
             },
+          },
           ],
           commitment: this.commitment,
         },
@@ -386,7 +409,7 @@ export class AnalyticsService extends BaseService {
           {
             memcmp: {
               offset: 0,
-              bytes: this.getDiscriminator("escrowAccount"),
+              bytes: discoMap["escrowAccount"],
             },
           },
         ],
@@ -405,9 +428,7 @@ export class AnalyticsService extends BaseService {
         }
       }, 0);
 
-      // Mock data for metrics that require historical tracking
-      // In a real implementation, these would be stored in a time-series database
-      const peakUsageHours = [9, 10, 11, 14, 15, 16, 20, 21]; // 9-11am, 2-4pm, 8-9pm UTC
+      const peakUsageHours = await this.getPeakUsage("-24h", "now()");
 
       return {
         totalTransactions: recentSlots.reduce(
@@ -478,15 +499,14 @@ export class AnalyticsService extends BaseService {
   // Helper Methods
   // ============================================================================
 
-  private getDiscriminator(accountType: string): string {
-    // This would need to be implemented based on your IDL
-    const discriminators: Record<string, string> = {
-      agentAccount: "6RdcqmKGhkRy",
-      messageAccount: "6RdcqmKGhkRz",
-      channelAccount: "6RdcqmKGhkRA",
-      escrowAccount: "6RdcqmKGhkRB",
-    };
-    return discriminators[accountType] || "";
+
+  private async getPeakUsage(start: string, stop: string): Promise<number[]> {
+    const peaks: number[] = [];
+    const flux = `from(bucket: "${influxBucket}") |> range(start: ${start}, stop: ${stop}) |> filter(fn: (r) => r._measurement == "network" and r._field == "peak")`;
+    for await (const row of queryApi.iterateRows(flux)) {
+      peaks.push(Number(row._value));
+    }
+    return peaks;
   }
 
   private convertMessageTypeFromProgram(programType: any): any {
