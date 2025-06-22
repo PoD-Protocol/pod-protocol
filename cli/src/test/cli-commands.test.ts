@@ -1,18 +1,22 @@
 import { spawn } from "bun";
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, afterAll, beforeAll } from "bun:test";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { existsSync, unlinkSync, copyFileSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const cliPath = join(__dirname, "..", "index.ts");
 const cwd = join(__dirname, "..", "..");
+const fixtureKeypairPath = join(__dirname, "test-keypair.json");
+const testKeypairPath = join(__dirname, "temp-keypair.json");
 
 async function runCli(args: string[], timeoutMs = 10000) {
   const proc = spawn(["bun", cliPath, "--no-banner", ...args], {
     cwd,
     stdout: "pipe",
     stderr: "pipe",
+    env: { ...process.env, CI: "true" },
   });
   try {
     const controller = new AbortController();
@@ -43,6 +47,9 @@ async function runCli(args: string[], timeoutMs = 10000) {
 }
 
 describe("CLI Command Tests", () => {
+  beforeAll(() => {
+    copyFileSync(fixtureKeypairPath, testKeypairPath);
+  });
   it("agent register dry run", async () => {
     const res = await runCli([
       "agent",
@@ -52,10 +59,12 @@ describe("CLI Command Tests", () => {
       "--metadata",
       "test",
       "--dry-run",
+      "--keypair",
+      testKeypairPath,
     ]);
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Dry run");
-    expect(res.stdout).toContain("Agent registration");
+    expect(res.stderr).toContain("Dry run");
+    expect(res.stderr).toContain("Agent registration");
   });
 
   it("message send dry run", async () => {
@@ -63,14 +72,16 @@ describe("CLI Command Tests", () => {
       "message",
       "send",
       "--recipient",
-      "11111111111111111111111111111111111111111111",
+      "11111111111111111111111111111111",
       "--payload",
       "hello",
       "--dry-run",
+      "--keypair",
+      testKeypairPath,
     ]);
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Dry run");
-    expect(res.stdout).toContain("Message send");
+    expect(res.stderr).toContain("Dry run");
+    expect(res.stderr).toContain("Message send");
   });
 
   it("channel create dry run", async () => {
@@ -84,10 +95,12 @@ describe("CLI Command Tests", () => {
       "--visibility",
       "public",
       "--dry-run",
+      "--keypair",
+      testKeypairPath,
     ]);
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Dry run");
-    expect(res.stdout).toContain("Creating channel");
+    expect(res.stderr).toContain("Dry run");
+    expect(res.stderr).toContain("Creating channel");
   });
 
   it("escrow deposit dry run", async () => {
@@ -95,25 +108,44 @@ describe("CLI Command Tests", () => {
       "escrow",
       "deposit",
       "--channel",
-      "11111111111111111111111111111111111111111111",
+      "11111111111111111111111111111111",
       "--lamports",
       "1000",
       "--dry-run",
+      "--keypair",
+      testKeypairPath,
     ]);
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Dry run");
-    expect(res.stdout).toContain("Escrow deposit");
+    expect(res.stderr).toContain("Dry run");
+    expect(res.stderr).toContain("Escrow deposit");
   });
 
   it("config show", async () => {
-    const res = await runCli(["config", "show"]);
+    const res = await runCli([
+      "config",
+      "show",
+      "--keypair",
+      testKeypairPath,
+    ]);
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("POD-COM CLI Configuration");
   });
 
   it("status command", async () => {
-    const res = await runCli(["status"]);
+    const res = await runCli([
+      "status",
+      "--keypair",
+      testKeypairPath,
+    ]);
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("PoD Protocol Status");
+  });
+
+  afterAll(() => {
+    if (existsSync(testKeypairPath)) {
+      try {
+        unlinkSync(testKeypairPath);
+      } catch {}
+    }
   });
 });
