@@ -21,7 +21,7 @@ If the token is incorrect or missing the analysis step will fail with an "unauth
 #### Node and Package Setup
 - Verify the Node.js version in `actions/setup-node` matches the version used locally.
 - If you rely on `npm ci`, ensure the lock file is committed and up to date.
-- Delete any existing `node_modules` caches from the Actions settings when you change Node.js versions.
+- Delete any existing `node_modules` caches (typically found under repository 'Settings' > 'Actions' > 'Caches') when you change Node.js versions.
 
 #### Docker and Build Failures
 - For Dockerized builds, check that the base image pulls successfully. A cached image may be outdated or missing.
