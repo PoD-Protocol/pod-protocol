@@ -28,7 +28,7 @@ If the token is incorrect or missing the analysis step will fail with an "unauth
 - Inspect the logs for any missing environment variables required by the build scripts.
 
 #### Runner Disk Space
-Large artifacts or caches can fill the runner's disk. If you see "No space left on device" errors, add cleanup steps or reduce artifact size. Using `actions/cache` with a `max-size` limit can prevent overuse.
+Large artifacts or caches can fill the runner's disk. If you see "No space left on device" errors, add cleanup steps (e.g., deleting large temporary files or build artifacts after they are no longer needed in the job) or reduce artifact size. Using `actions/cache` with a `max-size` limit can prevent overuse.
 
 #### Test Flakiness
 - Rerun failed jobs using the **Run workflow** button/option in the GitHub Actions UI to confirm if failures are transient.
