@@ -22,14 +22,19 @@ import {
 
 const provider = AnchorProvider.env();
 const program = new Program(idl as any, PROGRAM_ID, provider);
-const discoMap: Record<string, string> = {};
-if (Array.isArray((idl as any).accounts)) {
-  for (const acc of (idl as any).accounts) {
-    discoMap[acc.name] = utils.bytes.bs58.encode(
-      utils.accountDiscriminator(acc.name),
-    );
+function getAccountDiscriminators(idl: any): Record<string, string> {
+  const discoMap: Record<string, string> = {};
+  if (Array.isArray(idl.accounts)) {
+    for (const acc of idl.accounts) {
+      discoMap[acc.name] = utils.bytes.bs58.encode(
+        utils.accountDiscriminator(acc.name),
+      );
+    }
   }
+  return discoMap;
 }
+
+const discoMap: Record<string, string> = getAccountDiscriminators(idl as any);
 
 const influx = new InfluxDB({
   url: process.env.INFLUX_URL || "",
