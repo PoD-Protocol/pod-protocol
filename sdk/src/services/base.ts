@@ -1,5 +1,6 @@
 import { Connection, PublicKey, Commitment } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
+import { AppError } from "../errors";
 const { Program } = anchor;
 type AnchorProgram = anchor.Program<any>;
 
@@ -32,7 +33,9 @@ export abstract class BaseService {
 
   protected ensureInitialized(): AnchorProgram {
     if (!this.program) {
-      throw new Error(
+      throw new AppError(
+        "NOT_INITIALIZED",
+        400,
         "Client not initialized with wallet. Call client.initialize(wallet) first.",
       );
     }
@@ -43,7 +46,9 @@ export abstract class BaseService {
     const program = this.ensureInitialized();
     const accounts = program.account as any;
     if (!accounts || !accounts[accountName]) {
-      throw new Error(
+      throw new AppError(
+        "ACCOUNT_TYPE_NOT_FOUND",
+        400,
         `Account type '${accountName}' not found in program. Verify IDL is correct.`,
       );
     }
@@ -53,7 +58,9 @@ export abstract class BaseService {
   protected getProgramMethods() {
     const program = this.ensureInitialized();
     if (!program.methods) {
-      throw new Error(
+      throw new AppError(
+        "METHODS_NOT_AVAILABLE",
+        500,
         "Program methods not available. Verify IDL is correct and program is initialized.",
       );
     }
@@ -69,7 +76,7 @@ export abstract class BaseService {
    */
   setIDL(idl: any): void {
     if (!idl) {
-      throw new Error("Cannot set null or undefined IDL");
+      throw new AppError("INVALID_IDL", 400, "Cannot set null or undefined IDL");
     }
     this.idl = idl;
   }
@@ -83,7 +90,9 @@ export abstract class BaseService {
 
   protected ensureIDL(): any {
     if (!this.idl) {
-      throw new Error(
+      throw new AppError(
+        "IDL_NOT_SET",
+        500,
         "IDL not set. Call client.initialize() first or ensure IDL is properly imported.",
       );
     }

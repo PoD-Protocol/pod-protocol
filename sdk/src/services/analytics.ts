@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { BaseService } from "./base";
+import { AppError } from "../errors";
 import {
   AgentAccount,
   MessageAccount,
@@ -153,7 +154,11 @@ export class AnalyticsService extends BaseService {
         recentlyActive,
       };
     } catch (error: any) {
-      throw new Error(`Failed to get agent analytics: ${error.message}`);
+      throw new AppError(
+        "FETCH_FAILED",
+        500,
+        `Failed to get agent analytics: ${error.message}`,
+      );
     }
   }
 
@@ -258,7 +263,11 @@ export class AnalyticsService extends BaseService {
         recentMessages: messageData.slice(0, 20),
       };
     } catch (error: any) {
-      throw new Error(`Failed to get message analytics: ${error.message}`);
+      throw new AppError(
+        "FETCH_FAILED",
+        500,
+        `Failed to get message analytics: ${error.message}`,
+      );
     }
   }
 
@@ -355,7 +364,11 @@ export class AnalyticsService extends BaseService {
         averageChannelFee,
       };
     } catch (error: any) {
-      throw new Error(`Failed to get channel analytics: ${error.message}`);
+      throw new AppError(
+        "FETCH_FAILED",
+        500,
+        `Failed to get channel analytics: ${error.message}`,
+      );
     }
   }
 
@@ -421,7 +434,11 @@ export class AnalyticsService extends BaseService {
         peakUsageHours,
       };
     } catch (error: any) {
-      throw new Error(`Failed to get network analytics: ${error.message}`);
+      throw new AppError(
+        "FETCH_FAILED",
+        500,
+        `Failed to get network analytics: ${error.message}`,
+      );
     }
   }
 

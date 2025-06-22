@@ -4,6 +4,33 @@ const { BN } = anchor;
 import { BaseService } from "./base";
 import { AgentAccount, CreateAgentOptions, UpdateAgentOptions } from "../types";
 import { findAgentPDA, retry, getAccountLastUpdated } from "../utils";
+import { z } from "zod";
+import { ValidationError, AppError } from "../errors";
+
+const AgentRegistrationSchema = z.object({
+  name: z.string().min(3),
+  metadataUri: z.string().url(),
+  capabilities: z.array(z.string()).nonempty(),
+});
+
+const MetadataSchema = z.object({}).passthrough();
+
+function capabilitiesToBitmask(caps: string[]): number {
+  const map: Record<string, number> = {
+    TRADING: 1,
+    ANALYSIS: 2,
+    DATA_PROCESSING: 4,
+    CONTENT_GENERATION: 8,
+    CUSTOM_1: 16,
+    CUSTOM_2: 32,
+    CUSTOM_3: 64,
+    CUSTOM_4: 128,
+  };
+  return caps.reduce((acc, c) => {
+    const bit = map[c.toUpperCase()];
+    return bit ? acc | bit : acc;
+  }, 0);
+}
 
 /**
  * Agent-related operations service
@@ -11,7 +38,7 @@ import { findAgentPDA, retry, getAccountLastUpdated } from "../utils";
 export class AgentService extends BaseService {
   async registerAgent(
     wallet: Signer,
-    options: CreateAgentOptions,
+    options: any,
   ): Promise<string> {
     const [agentPDA] = findAgentPDA(wallet.publicKey, this.programId);
 
@@ -23,14 +50,23 @@ export class AgentService extends BaseService {
         program = this.program;
       } else {
         // This should not happen if client.initialize(wallet) was called properly
-        throw new Error(
+        throw new AppError(
+          "NO_PROGRAM",
+          500,
           "No program instance available. Ensure client.initialize(wallet) was called successfully.",
         );
       }
 
       try {
+        const result = AgentRegistrationSchema.safeParse(options);
+        if (!result.success) throw new ValidationError(result.error.issues);
+        const meta = await fetch(result.data.metadataUri).then((r) => r.json());
+        const metaRes = MetadataSchema.safeParse(meta);
+        if (!metaRes.success) throw new ValidationError(metaRes.error.issues);
+        const caps = capabilitiesToBitmask(result.data.capabilities);
+
         const tx = await (program.methods as any)
-          .registerAgent(new BN(options.capabilities), options.metadataUri)
+          .registerAgent(new BN(caps), result.data.metadataUri)
           .accounts({
             agentAccount: agentPDA,
             signer: wallet.publicKey,
@@ -42,21 +78,31 @@ export class AgentService extends BaseService {
       } catch (error: any) {
         // Provide more specific error messages
         if (error.message?.includes("Account does not exist")) {
-          throw new Error(
+          throw new AppError(
+            "ACCOUNT_NOT_FOUND",
+            404,
             "Program account not found. Verify the program is deployed and the program ID is correct.",
           );
         }
         if (error.message?.includes("insufficient funds")) {
-          throw new Error(
+          throw new AppError(
+            "INSUFFICIENT_FUNDS",
+            400,
             "Insufficient SOL balance to pay for transaction fees and rent.",
           );
         }
         if (error.message?.includes("custom program error")) {
-          throw new Error(
+          throw new AppError(
+            "PROGRAM_ERROR",
+            500,
             `Program error: ${error.message}. Check program logs for details.`,
           );
         }
-        throw new Error(`Agent registration failed: ${error.message}`);
+        throw new AppError(
+          "AGENT_REGISTRATION_FAILED",
+          500,
+          `Agent registration failed: ${error.message}`,
+        );
       }
     });
   }
@@ -122,10 +168,10 @@ export class AgentService extends BaseService {
         const dummyWallet = {
           publicKey: anchor.web3.PublicKey.default,
           signTransaction: async () => {
-            throw new Error("Read-only");
+            throw new AppError("READ_ONLY", 400, "Read-only");
           },
           signAllTransactions: async () => {
-            throw new Error("Read-only");
+            throw new AppError("READ_ONLY", 400, "Read-only");
           },
         };
 
@@ -165,10 +211,10 @@ export class AgentService extends BaseService {
       const dummyWallet = {
         publicKey: anchor.web3.PublicKey.default,
         signTransaction: async () => {
-          throw new Error("Read-only");
+          throw new AppError("READ_ONLY", 400, "Read-only");
         },
         signAllTransactions: async () => {
-          throw new Error("Read-only");
+          throw new AppError("READ_ONLY", 400, "Read-only");
         },
       };
 
@@ -191,7 +237,11 @@ export class AgentService extends BaseService {
         bump: acc.account.bump,
       }));
     } catch (error: any) {
-      throw new Error(`Failed to fetch agents: ${error.message}`);
+      throw new AppError(
+        "FETCH_FAILED",
+        500,
+        `Failed to fetch agents: ${error.message}`,
+      );
     }
   }
 }

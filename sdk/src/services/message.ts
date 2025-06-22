@@ -6,6 +6,8 @@ import {
 } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 import { BaseService } from "./base";
+import { z } from "zod";
+import { AppError, MessageExpiredError } from "../errors";
 import {
   MessageAccount,
   SendMessageOptions,
@@ -22,6 +24,16 @@ import {
   getAccountTimestamp,
   getAccountCreatedAt,
 } from "../utils";
+
+const MessageSchema = z.object({
+  id: z.string().uuid(),
+  sender: z.string().min(1),
+  recipient: z.string().min(1),
+  body: z.string().nonempty(),
+  ttlSeconds: z.number().int().positive(),
+});
+
+const db = new Map<string, any>();
 
 /**
  * Message-related operations service
@@ -147,7 +159,11 @@ export class MessageService extends BaseService {
         return this.convertMessageAccountFromProgram(account, acc.pubkey);
       });
     } catch (error: any) {
-      throw new Error(`Failed to fetch agent messages: ${error.message}`);
+      throw new AppError(
+        "FETCH_FAILED",
+        500,
+        `Failed to fetch agent messages: ${error.message}`,
+      );
     }
   }
 
@@ -178,7 +194,7 @@ export class MessageService extends BaseService {
       case MessageStatus.Failed:
         return { failed: {} };
       default:
-        throw new Error(`Unknown message status: ${status}`);
+        throw new ValidationError(`Unknown message status: ${status}`);
     }
   }
 
@@ -187,7 +203,9 @@ export class MessageService extends BaseService {
     if (programStatus.delivered) return MessageStatus.Delivered;
     if (programStatus.read) return MessageStatus.Read;
     if (programStatus.failed) return MessageStatus.Failed;
-    throw new Error(`Unknown program status: ${JSON.stringify(programStatus)}`);
+    throw new ValidationError(
+      `Unknown program status: ${JSON.stringify(programStatus)}`,
+    );
   }
 
   private convertMessageAccountFromProgram(
@@ -208,4 +226,16 @@ export class MessageService extends BaseService {
       bump: account.bump,
     };
   }
+}
+
+export async function sendMessage(payload: any): Promise<void> {
+  const msg = MessageSchema.parse(payload);
+  const expiresAt = new Date(Date.now() + msg.ttlSeconds * 1000);
+  db.set(msg.id, { ...msg, expiresAt });
+}
+
+export async function getMessage(id: string): Promise<any> {
+  const msg = db.get(id);
+  if (!msg || msg.expiresAt < new Date()) throw new MessageExpiredError(id);
+  return msg;
 }
