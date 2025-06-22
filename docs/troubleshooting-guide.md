@@ -16,7 +16,7 @@
 # Navigate to: Settings > Secrets and variables > Actions
 # Ensure `SONAR_TOKEN` contains your valid SonarCloud token
 ```
-If the token is incorrect or missing the analysis step will fail with an "unauthorized" message. Re‑add the token and re‑run the workflow.
+If the token is incorrect or missing the analysis step will fail with an "unauthorized" message. Re-add the token and re-run the workflow.
 
 #### Node and Package Setup
 - Verify the Node.js version in `actions/setup-node` matches the version used locally.
