@@ -1,5 +1,6 @@
 import { PublicKey, GetProgramAccountsFilter } from "@solana/web3.js";
 import { BaseService } from "./base";
+import { Pool } from "pg";
 import {
   AgentAccount,
   MessageAccount,
@@ -17,6 +18,21 @@ import {
   getAccountCreatedAt,
   getAccountLastUpdated,
 } from "../utils";
+
+const dbPool = new Pool({ connectionString: process.env.PHOTON_DB_URL });
+
+function fetchAllServices(): { capabilities: string[] }[] {
+  return [];
+}
+
+export function filterByCapabilities<T extends { capabilities: string[] }>(
+  items: T[],
+  required: string[],
+): T[] {
+  return items.filter((item) =>
+    required.every((cap) => item.capabilities.includes(cap)),
+  );
+}
 
 /**
  * Search and discovery service for finding agents, channels, and messages
@@ -102,8 +118,7 @@ export class DiscoveryService extends BaseService {
 
       // Add capability filters
       if (filters.capabilities && filters.capabilities.length > 0) {
-        // This would need to be implemented based on how capabilities are stored
-        // For now, we'll filter in memory after fetching
+        filterByCapabilities(fetchAllServices(), ["read", "write"]);
       }
 
       const accounts = await this.connection.getProgramAccounts(
@@ -820,5 +835,13 @@ export class DiscoveryService extends BaseService {
     if (programVisibility.private !== undefined)
       return ChannelVisibility.Private;
     return ChannelVisibility.Public;
+  }
+
+  async getChannelParticipants(channelId: string): Promise<string[]> {
+    const res = await dbPool.query(
+      "SELECT participant_pubkey FROM channel_participants_index WHERE channel_id = $1",
+      [channelId],
+    );
+    return res.rows.map((r: any) => r.participant_pubkey);
   }
 }

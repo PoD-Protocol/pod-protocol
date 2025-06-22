@@ -1,5 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { BaseService } from "./base";
+import anchor from "@coral-xyz/anchor";
+import { IDL as PodComIDL } from "../pod_com";
+import { PROGRAM_ID } from "../types";
+import { InfluxDB } from "@influxdata/influxdb-client";
 import {
   AgentAccount,
   MessageAccount,
@@ -15,6 +19,24 @@ import {
   getCapabilityNames,
   hasCapability,
 } from "../utils";
+
+const provider = anchor.AnchorProvider.env();
+const program = new anchor.Program(PodComIDL as any, PROGRAM_ID, provider);
+const discoMap: Record<string, string> = {};
+if ((PodComIDL as any).accounts) {
+  for (const acc of (PodComIDL as any).accounts) {
+    discoMap[acc.name] = anchor.utils.bytes.bs58.encode(
+      anchor.utils.accountDiscriminator(acc.name),
+    );
+  }
+}
+
+const influx = new InfluxDB({
+  url: process.env.INFLUX_URL || "",
+  token: process.env.INFLUX_TOKEN || "",
+});
+const influxOrg = process.env.INFLUX_ORG || "";
+const influxBucket = process.env.INFLUX_BUCKET || "";
 
 /**
  * Analytics and insights for agent activities, message patterns, and channel usage
@@ -405,9 +427,12 @@ export class AnalyticsService extends BaseService {
         }
       }, 0);
 
-      // Mock data for metrics that require historical tracking
-      // In a real implementation, these would be stored in a time-series database
-      const peakUsageHours = [9, 10, 11, 14, 15, 16, 20, 21]; // 9-11am, 2-4pm, 8-9pm UTC
+      const now = new Date();
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const peakUsageHours = await this.getPeakUsage(
+        yesterday.toISOString(),
+        now.toISOString(),
+      );
 
       return {
         totalTransactions: recentSlots.reduce(
@@ -474,19 +499,30 @@ export class AnalyticsService extends BaseService {
     return report;
   }
 
+  private async getPeakUsage(start: string, stop: string): Promise<number[]> {
+    const queryApi = influx.getQueryApi(influxOrg);
+    const query = `from(bucket: "${influxBucket}")\n  |> range(start: ${start}, stop: ${stop})\n  |> filter(fn: (r) => r["_measurement"] == "usage")\n  |> aggregateWindow(every: 1h, fn: sum)\n  |> yield(name: "sum")`;
+
+    const peaks: number[] = [];
+    return new Promise((resolve, reject) => {
+      queryApi.queryRows(query, {
+        next: (row, tableMeta) => {
+          const o = tableMeta.toObject(row);
+          const hour = new Date(o._time).getUTCHours();
+          peaks.push(hour);
+        },
+        error: reject,
+        complete: () => resolve(peaks),
+      });
+    });
+  }
+
   // ============================================================================
   // Helper Methods
   // ============================================================================
 
   private getDiscriminator(accountType: string): string {
-    // This would need to be implemented based on your IDL
-    const discriminators: Record<string, string> = {
-      agentAccount: "6RdcqmKGhkRy",
-      messageAccount: "6RdcqmKGhkRz",
-      channelAccount: "6RdcqmKGhkRA",
-      escrowAccount: "6RdcqmKGhkRB",
-    };
-    return discriminators[accountType] || "";
+    return discoMap[accountType] || "";
   }
 
   private convertMessageTypeFromProgram(programType: any): any {
