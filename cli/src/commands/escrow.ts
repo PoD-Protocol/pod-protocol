@@ -213,7 +213,6 @@ export class EscrowCommands {
       all: options.all,
     });
     const channelKey = validatePublicKey(channelId, "channel ID");
-    const spinner = createSpinner("Depositing to escrow...");
     if (
       handleDryRun(globalOpts, spinner, "Escrow deposit", {
         Channel: channelId,
