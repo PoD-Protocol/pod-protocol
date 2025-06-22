@@ -846,9 +846,15 @@ export class DiscoveryService extends BaseService {
 export async function getChannelParticipants(
   channelId: string,
 ): Promise<string[]> {
-  const result = await db.query(
-    'SELECT participant_pubkey FROM channel_participants_index WHERE channel_id = $1',
-    [channelId],
-  );
-  return result.rows.map((r) => r.participant_pubkey);
+  try {
+    const result = await db.query(
+      'SELECT participant_pubkey FROM channel_participants_index WHERE channel_id = $1',
+      [channelId],
+    );
+    return result.rows.map((r) => r.participant_pubkey);
+  } catch (error) {
+    console.error("Failed to get channel participants:", error);
+    return []; // Or throw the error, depending on desired behavior
+  }
+}
 }
