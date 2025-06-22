@@ -19,7 +19,7 @@ import {
   getAccountLastUpdated,
 } from "../utils";
 
-declare function fetchAllServices(): Array<{ capabilities: string[] }>;
+import { fetchAllServices } from "../some-module"; // Example: if it's in another module
 
 function filterByCapabilities<T extends { capabilities: string[] }>(
   items: T[],
