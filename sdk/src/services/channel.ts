@@ -317,7 +317,7 @@ export class ChannelService extends BaseService {
    */
   async getChannelParticipants(
     channelPDA: PublicKey,
-    limit: number = 50
+    limit: number = 50,
   ): Promise<Array<any>> {
     try {
       const participantAccount = this.getAccount("channelParticipant");
@@ -343,7 +343,7 @@ export class ChannelService extends BaseService {
    */
   async getChannelMessages(
     channelPDA: PublicKey,
-    limit: number = 50
+    limit: number = 50,
   ): Promise<Array<any>> {
     try {
       const messageAccount = this.getAccount("channelMessage");

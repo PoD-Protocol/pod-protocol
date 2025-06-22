@@ -6,10 +6,10 @@
  * IDL can be found at `target/idl/pod_com.json`.
  */
 
-// Constants to eliminate duplicate values
-const AGENT_SEED = [97, 103, 101, 110, 116];
-const ESCROW_SEED = [101, 115, 99, 114, 111, 119];
-const CHANNEL_SEED = [99, 104, 97, 110, 110, 101, 108];
+// Constants to eliminate duplicate values - with proper type assertions
+const AGENT_SEED = [97, 103, 101, 110, 116] as const;
+const ESCROW_SEED = [101, 115, 99, 114, 111, 119] as const;
+const CHANNEL_SEED = [99, 104, 97, 110, 110, 101, 108] as const;
 const SYSTEM_PROGRAM_ID = "11111111111111111111111111111111";
 
 export type PodCom = {
@@ -657,7 +657,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: CHANNEL_SEED,
+                value: [...CHANNEL_SEED],
               },
               {
                 kind: "account",
@@ -718,7 +718,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: ESCROW_SEED,
+                value: [...ESCROW_SEED],
               },
               {
                 kind: "account",
@@ -763,7 +763,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: AGENT_SEED,
+                value: [...AGENT_SEED],
               },
               {
                 kind: "account",
@@ -807,7 +807,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: AGENT_SEED,
+                value: [...AGENT_SEED],
               },
               {
                 kind: "account",
@@ -858,7 +858,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: AGENT_SEED,
+                value: [...AGENT_SEED],
               },
               {
                 kind: "account",
@@ -902,7 +902,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: AGENT_SEED,
+                value: [...AGENT_SEED],
               },
               {
                 kind: "account",
@@ -938,7 +938,7 @@ export const IDL: PodCom = {
             seeds: [
               {
                 kind: "const",
-                value: ESCROW_SEED,
+                value: [...ESCROW_SEED],
               },
               {
                 kind: "account",

@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { table } from "table";
-// import { getTableConfig, formatValue } from "../../utils/shared.js";
+import { getTableConfig, formatValue } from "../../utils/shared.js";
 
 export class ChannelDisplayer {
   displayChannelInfo(channelData: any): void {

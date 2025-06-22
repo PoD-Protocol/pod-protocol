@@ -22,6 +22,8 @@ export default {
     resolve({
       browser: false,
       preferBuiltins: true,
+      exportConditions: ["node"],
+      skip: ["ipfs-http-client", "multiformats"],
     }),
     commonjs({
       include: ["node_modules/**"],
@@ -44,5 +46,9 @@ export default {
     "@solana/web3.js",
     "@coral-xyz/anchor",
     "@solana/wallet-adapter-base",
+    "ipfs-http-client",
+    "multiformats",
+    "@lightprotocol/stateless.js",
+    "@lightprotocol/compressed-token",
   ],
 };

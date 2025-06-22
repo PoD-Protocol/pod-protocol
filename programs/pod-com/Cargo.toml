@@ -19,16 +19,20 @@ no-log-ix-name = []
 
 [dependencies]
 # Core dependencies
-anchor-lang = { version = "=0.31.1", default-features = false, features = ["init-if-needed"] }
+anchor-lang = { version = "=0.30.1", default-features = false, features = ["init-if-needed"] }
 
-# Use solana-program for compatibility with Anchor macros
-solana-program = { version = "=2.3.0", default-features = false }
+# Remove solana-program to use anchor-lang exported version
+# solana-program = { version = "=1.18.22", default-features = false }
 
-# Light Protocol ZK Compression dependencies
-light-compressed-token = { version = "1.0.0", default-features = false }
-light-system-program = { version = "1.0.0", default-features = false }
-light-hasher = { version = "1.0.0", default-features = false }
-light-utils = { version = "1.0.0", default-features = false }
+# Light Protocol ZK Compression dependencies - Temporarily commented out for base build
+# light-compressed-token = { version = "2.0.0", default-features = false }
+# light-system-program = { version = "1.2.0", default-features = false }
+# light-hasher = { version = "3.1.0", default-features = false }
+# light-utils = { version = "1.1.0", default-features = false }
+# light-macros = { version = "2.1.0", default-features = false }
+
+# Keep SHA2 for fallback hashing
+sha2 = { version = "0.10", default-features = false }
 
 # Spl dependencies (commented out as they're optional)
 # spl-token = { version = "=4.0.0", optional = true, default-features = false }
@@ -41,11 +45,14 @@ light-utils = { version = "1.0.0", default-features = false }
 # Error handling
 thiserror = "=2.0.12"
 
+# Force compatible zeroize version (removed due to conflicts)
+# zeroize = { workspace = true }
+
 # Explicitly disable any features that might pull in getrandom/rand
 [package.metadata.docs.rs]
 all-features = false
 no-default-features = true
 
 [dev-dependencies]
-anchor-lang = { version = "=0.31.1", features = ["derive"] }
+anchor-lang = { version = "=0.30.1", features = ["derive"] }
 # Test dependencies can be added here if needed

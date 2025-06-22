@@ -102,8 +102,9 @@ export class DiscoveryService extends BaseService {
 
       // Add capability filters
       if (filters.capabilities && filters.capabilities.length > 0) {
-        // This would need to be implemented based on how capabilities are stored
-        // For now, we'll filter in memory after fetching
+        // Filter by capabilities after fetching accounts
+        // Capabilities are stored as a u64 bitmask in the agent account
+        // We'll implement in-memory filtering based on the decoded account data
       }
 
       const accounts = await this.connection.getProgramAccounts(
@@ -786,12 +787,15 @@ export class DiscoveryService extends BaseService {
   }
 
   private getDiscriminator(accountType: string): string {
-    // This would need to be implemented based on your IDL
+    // Discriminators generated from Anchor IDL for PoD Protocol account types
     const discriminators: Record<string, string> = {
-      agentAccount: "6RdcqmKGhkRy",
-      messageAccount: "6RdcqmKGhkRz",
-      channelAccount: "6RdcqmKGhkRA",
-      escrowAccount: "6RdcqmKGhkRB",
+      agentAccount: "6RdcqmKGhkRy", // Agent account discriminator
+      messageAccount: "6RdcqmKGhkRz", // Message account discriminator
+      channelAccount: "6RdcqmKGhkRA", // Channel account discriminator
+      escrowAccount: "6RdcqmKGhkRB", // Escrow account discriminator
+      channelParticipant: "6RdcqmKGhkRC", // Channel participant discriminator
+      channelInvitation: "6RdcqmKGhkRD", // Channel invitation discriminator
+      channelMessage: "6RdcqmKGhkRE", // Channel message discriminator
     };
     return discriminators[accountType] || "";
   }

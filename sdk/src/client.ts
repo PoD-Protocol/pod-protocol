@@ -29,7 +29,10 @@ import { EscrowService } from "./services/escrow";
 import { AnalyticsService } from "./services/analytics";
 import { DiscoveryService } from "./services/discovery";
 import { IPFSService, IPFSConfig } from "./services/ipfs";
-import { ZKCompressionService, ZKCompressionConfig } from "./services/zk-compression";
+import {
+  ZKCompressionService,
+  ZKCompressionConfig,
+} from "./services/zk-compression";
 
 /**
  * Main PoD Protocol SDK client for interacting with the protocol
@@ -72,15 +75,15 @@ export class PodComClient {
     this.escrow = new EscrowService(serviceConfig);
     this.analytics = new AnalyticsService(serviceConfig);
     this.discovery = new DiscoveryService(serviceConfig);
-    
+
     // Initialize IPFS service
     this.ipfs = new IPFSService(serviceConfig, config.ipfs || {});
-    
+
     // Initialize ZK Compression service with IPFS dependency
     this.zkCompression = new ZKCompressionService(
       serviceConfig,
       config.zkCompression || {},
-      this.ipfs
+      this.ipfs,
     );
   }
 
@@ -102,9 +105,9 @@ export class PodComClient {
             "IDL not found. Ensure the program IDL is properly generated and imported.",
           );
         }
-        
+
         this.program = new Program(IDL as any, provider);
-        
+
         // Validate program was created successfully
         if (!this.program) {
           throw new Error("Failed to create Anchor program instance");
@@ -312,7 +315,7 @@ export class PodComClient {
    */
   async getChannelParticipants(
     channelPDA: PublicKey,
-    limit: number = 50
+    limit: number = 50,
   ): Promise<Array<any>> {
     return this.channels.getChannelParticipants(channelPDA, limit);
   }
@@ -322,7 +325,7 @@ export class PodComClient {
    */
   async getChannelMessages(
     channelPDA: PublicKey,
-    limit: number = 50
+    limit: number = 50,
   ): Promise<Array<any>> {
     return this.channels.getChannelMessages(channelPDA, limit);
   }

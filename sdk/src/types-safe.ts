@@ -61,17 +61,33 @@ export interface AccountWrapper<T = any> {
 
 // Type guards
 export function isAgentAccount(account: any): account is AgentAccount {
-  return account && typeof account.publicKey === 'string' && typeof account.capabilities === 'number';
+  return (
+    account &&
+    typeof account.publicKey === "string" &&
+    typeof account.capabilities === "number"
+  );
 }
 
 export function isChannelAccount(account: any): account is ChannelAccount {
-  return account && typeof account.name === 'string' && typeof account.creator === 'string';
+  return (
+    account &&
+    typeof account.name === "string" &&
+    typeof account.creator === "string"
+  );
 }
 
 export function isMessageAccount(account: any): account is MessageAccount {
-  return account && typeof account.channel === 'string' && typeof account.sender === 'string';
+  return (
+    account &&
+    typeof account.channel === "string" &&
+    typeof account.sender === "string"
+  );
 }
 
 export function isEscrowAccount(account: any): account is EscrowAccount {
-  return account && typeof account.depositor === 'string' && typeof account.amount === 'number';
+  return (
+    account &&
+    typeof account.depositor === "string" &&
+    typeof account.amount === "number"
+  );
 }

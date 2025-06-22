@@ -1,6 +1,6 @@
-import { create, IPFSHTTPClient } from 'ipfs-http-client';
-import { CID } from 'multiformats/cid';
-import { BaseService, BaseServiceConfig } from './base.js';
+import { create, IPFSHTTPClient } from "ipfs-http-client";
+import { CID } from "multiformats/cid";
+import { BaseService, BaseServiceConfig } from "./base.js";
 
 /**
  * IPFS configuration options
@@ -43,7 +43,7 @@ export interface ParticipantExtendedMetadata {
  */
 export interface IPFSStorageResult {
   hash: string;
-  cid: CID;
+  cid: any; // Using any to avoid CID version conflicts between dependencies
   size: number;
   url: string;
 }
@@ -58,10 +58,10 @@ export class IPFSService extends BaseService {
 
   constructor(baseConfig: BaseServiceConfig, ipfsConfig: IPFSConfig = {}) {
     super(baseConfig);
-    
+
     this.config = {
-      url: ipfsConfig.url || 'https://ipfs.infura.io:5001',
-      apiPath: ipfsConfig.apiPath || '/api/v0',
+      url: ipfsConfig.url || "https://ipfs.infura.io:5001",
+      apiPath: ipfsConfig.apiPath || "/api/v0",
       timeout: ipfsConfig.timeout || 30000,
       ...ipfsConfig,
     };
@@ -80,14 +80,14 @@ export class IPFSService extends BaseService {
   async storeMessageContent(
     content: string,
     attachments: string[] = [],
-    metadata: Record<string, any> = {}
+    metadata: Record<string, any> = {},
   ): Promise<IPFSStorageResult> {
     const messageContent: ChannelMessageContent = {
       content,
       attachments,
       metadata,
       timestamp: Date.now(),
-      version: '1.0.0',
+      version: "1.0.0",
     };
 
     return this.storeJSON(messageContent);
@@ -100,7 +100,7 @@ export class IPFSService extends BaseService {
     displayName: string,
     avatar?: string,
     permissions: string[] = [],
-    customData: Record<string, any> = {}
+    customData: Record<string, any> = {},
   ): Promise<IPFSStorageResult> {
     const participantMetadata: ParticipantExtendedMetadata = {
       displayName,
@@ -119,14 +119,11 @@ export class IPFSService extends BaseService {
   async storeJSON(data: any): Promise<IPFSStorageResult> {
     try {
       const jsonString = JSON.stringify(data, null, 2);
-      const result = await this.client.add(
-        Buffer.from(jsonString, 'utf-8'),
-        {
-          pin: true,
-          cidVersion: 1,
-          hashAlg: 'sha2-256',
-        }
-      );
+      const result = await this.client.add(Buffer.from(jsonString, "utf-8"), {
+        pin: true,
+        cidVersion: 1,
+        hashAlg: "sha2-256",
+      });
 
       return {
         hash: result.cid.toString(),
@@ -144,13 +141,13 @@ export class IPFSService extends BaseService {
    */
   async storeFile(
     data: Buffer | Uint8Array,
-    filename?: string
+    filename?: string,
   ): Promise<IPFSStorageResult> {
     try {
       const options: any = {
         pin: true,
         cidVersion: 1,
-        hashAlg: 'sha2-256',
+        hashAlg: "sha2-256",
       };
 
       if (filename) {
@@ -177,12 +174,12 @@ export class IPFSService extends BaseService {
   async retrieveJSON<T = any>(hash: string): Promise<T> {
     try {
       const chunks: Uint8Array[] = [];
-      
+
       for await (const chunk of this.client.cat(hash)) {
         chunks.push(chunk);
       }
 
-      const data = Buffer.concat(chunks).toString('utf-8');
+      const data = Buffer.concat(chunks).toString("utf-8");
       return JSON.parse(data) as T;
     } catch (error) {
       throw new Error(`Failed to retrieve data from IPFS: ${error}`);
@@ -199,7 +196,9 @@ export class IPFSService extends BaseService {
   /**
    * Retrieve participant metadata from IPFS
    */
-  async retrieveParticipantMetadata(hash: string): Promise<ParticipantExtendedMetadata> {
+  async retrieveParticipantMetadata(
+    hash: string,
+  ): Promise<ParticipantExtendedMetadata> {
     return this.retrieveJSON<ParticipantExtendedMetadata>(hash);
   }
 
@@ -209,7 +208,7 @@ export class IPFSService extends BaseService {
   async retrieveFile(hash: string): Promise<Buffer> {
     try {
       const chunks: Uint8Array[] = [];
-      
+
       for await (const chunk of this.client.cat(hash)) {
         chunks.push(chunk);
       }
@@ -258,8 +257,14 @@ export class IPFSService extends BaseService {
    */
   async contentExists(hash: string): Promise<boolean> {
     try {
-      const stats = await this.client.object.stat(hash);
-      return stats.Hash === hash;
+      // Use pin.ls instead of object.stat to avoid CID type conflicts
+      const pins = this.client.pin.ls({ paths: [hash] });
+      for await (const pin of pins) {
+        if (pin.cid.toString() === hash) {
+          return true;
+        }
+      }
+      return false;
     } catch (error) {
       return false;
     }
@@ -273,25 +278,31 @@ export class IPFSService extends BaseService {
     // For now, using a simple approach - in production, use the same hash function as Rust program
     const encoder = new TextEncoder();
     const data = encoder.encode(content);
-    
+
     // This should match the hashing used in the Solana program
     return Array.from(data)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   /**
    * Batch store multiple content items
    */
-  async batchStore(items: Array<{ content: any; filename?: string }>): Promise<IPFSStorageResult[]> {
+  async batchStore(
+    items: Array<{ content: any; filename?: string }>,
+  ): Promise<IPFSStorageResult[]> {
     const results: IPFSStorageResult[] = [];
-    
+
     for (const item of items) {
-      if (typeof item.content === 'string' || Buffer.isBuffer(item.content)) {
-        results.push(await this.storeFile(
-          Buffer.isBuffer(item.content) ? item.content : Buffer.from(item.content),
-          item.filename
-        ));
+      if (typeof item.content === "string" || Buffer.isBuffer(item.content)) {
+        results.push(
+          await this.storeFile(
+            Buffer.isBuffer(item.content)
+              ? item.content
+              : Buffer.from(item.content),
+            item.filename,
+          ),
+        );
       } else {
         results.push(await this.storeJSON(item.content));
       }
@@ -303,7 +314,10 @@ export class IPFSService extends BaseService {
   /**
    * Get gateway URL for content
    */
-  getGatewayUrl(hash: string, gateway: string = 'https://ipfs.io/ipfs/'): string {
+  getGatewayUrl(
+    hash: string,
+    gateway: string = "https://ipfs.io/ipfs/",
+  ): string {
     return `${gateway}${hash}`;
   }
 

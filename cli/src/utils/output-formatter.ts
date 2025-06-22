@@ -381,6 +381,80 @@ export class OutputFormatter {
     }
   }
 
+  /**
+   * Display a success message with formatted output
+   */
+  public success(message: string, data?: any): void {
+    if (this.quiet) return;
+
+    console.log(`${ICONS.success} ${BRAND_COLORS.success(message)}`);
+
+    if (data) {
+      console.log();
+      if (typeof data === "object") {
+        console.log(BRAND_COLORS.dim(JSON.stringify(data, null, 2)));
+      } else {
+        console.log(BRAND_COLORS.dim(String(data)));
+      }
+    }
+    console.log();
+  }
+
+  /**
+   * Display an info message with formatted output
+   */
+  public info(message: string, data?: any): void {
+    if (this.quiet) return;
+
+    console.log(`${ICONS.info} ${BRAND_COLORS.info(message)}`);
+
+    if (data) {
+      console.log();
+      if (typeof data === "object") {
+        console.log(BRAND_COLORS.dim(JSON.stringify(data, null, 2)));
+      } else {
+        console.log(BRAND_COLORS.dim(String(data)));
+      }
+    }
+    console.log();
+  }
+
+  /**
+   * Display a warning message with formatted output
+   */
+  public warning(message: string, data?: any): void {
+    if (this.quiet) return;
+
+    console.log(`${ICONS.warning} ${BRAND_COLORS.warning(message)}`);
+
+    if (data) {
+      console.log();
+      if (typeof data === "object") {
+        console.log(BRAND_COLORS.dim(JSON.stringify(data, null, 2)));
+      } else {
+        console.log(BRAND_COLORS.dim(String(data)));
+      }
+    }
+    console.log();
+  }
+
+  /**
+   * Display an error message with formatted output
+   */
+  public error(message: string, data?: any): void {
+    console.error(`${ICONS.error} ${BRAND_COLORS.error(message)}`);
+
+    if (data) {
+      console.error();
+      if (typeof data === "object") {
+        console.error(BRAND_COLORS.dim(JSON.stringify(data, null, 2)));
+      } else {
+        console.error(BRAND_COLORS.dim(String(data)));
+      }
+    }
+    console.error();
+  }
+
   // Private helper methods
 
   private formatCapabilities(capabilities: number): string {

@@ -149,3 +149,16 @@ export async function safeExecute<T>(
     ErrorHandler.handleError(error as Error, spinner, errorContext);
   }
 }
+
+/**
+ * Simple error display function for CLI commands
+ */
+export function displayError(message: string, error?: Error): void {
+  console.error(chalk.red("Error:"), message);
+  if (error) {
+    console.error(chalk.red("Details:"), error.message);
+    if (process.env.DEBUG) {
+      console.error(chalk.dim(error.stack || ""));
+    }
+  }
+}
