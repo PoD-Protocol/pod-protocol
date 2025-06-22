@@ -33,11 +33,11 @@ if (Array.isArray((IDL as any).accounts)) {
 }
 
 const influx = new InfluxDB({
-  url: process.env.INFLUX_URL || "",
-  token: process.env.INFLUX_TOKEN || "",
+  url: process.env.INFLUX_URL || "http://localhost:8086", // Provide a default or throw error
+  token: process.env.INFLUX_TOKEN || "", // Consider if a default token is safe/sensible
 });
-const influxQuery = influx.getQueryApi(process.env.INFLUX_ORG || "");
-const INFLUX_BUCKET = process.env.INFLUX_BUCKET || "";
+const influxQuery = influx.getQueryApi(process.env.INFLUX_ORG || "default-org"); // Provide a default or throw error
+const INFLUX_BUCKET = process.env.INFLUX_BUCKET || "default-bucket"; // Provide a default or throw error
 
 /**
  * Analytics and insights for agent activities, message patterns, and channel usage
