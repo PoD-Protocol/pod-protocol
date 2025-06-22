@@ -93,7 +93,7 @@ export class DiscoveryService extends BaseService {
         {
           memcmp: {
             offset: 0,
-            bytes: this.getDiscriminator("agentAccount"),
+            bytes: getDiscriminator("agentAccount"),
           },
         },
       ];
@@ -125,10 +125,10 @@ export class DiscoveryService extends BaseService {
       });
 
       // Apply in-memory filters
-      agents = this.applyAgentFilters(agents, filters);
+      agents = applyAgentFilters(agents, filters);
       
       // Apply sorting
-      agents = this.sortAgents(agents, filters);
+      agents = sortAgents(agents, filters);
 
       // Apply pagination
       const offset = filters.offset || 0;
@@ -158,7 +158,7 @@ export class DiscoveryService extends BaseService {
         {
           memcmp: {
             offset: 0,
-            bytes: this.getDiscriminator("messageAccount"),
+            bytes: getDiscriminator("messageAccount"),
           },
         },
       ];
@@ -199,8 +199,8 @@ export class DiscoveryService extends BaseService {
           recipient: account.recipient,
           payload: account.payload || "",
           payloadHash: account.payloadHash,
-          messageType: this.convertMessageTypeFromProgram(account.messageType),
-          status: this.convertMessageStatusFromProgram(account.status),
+          messageType: convertMessageTypeFromProgram(account.messageType),
+          status: convertMessageStatusFromProgram(account.status),
           timestamp: getAccountTimestamp(account),
           createdAt: getAccountCreatedAt(account),
           expiresAt: account.expiresAt?.toNumber() || 0,
@@ -209,10 +209,10 @@ export class DiscoveryService extends BaseService {
       });
 
       // Apply in-memory filters
-      messages = this.applyMessageFilters(messages, filters);
+      messages = applyMessageFilters(messages, filters);
       
       // Apply sorting
-      messages = this.sortMessages(messages, filters);
+      messages = sortMessages(messages, filters);
 
       // Apply pagination
       const offset = filters.offset || 0;
@@ -242,7 +242,7 @@ export class DiscoveryService extends BaseService {
         {
           memcmp: {
             offset: 0,
-            bytes: this.getDiscriminator("channelAccount"),
+            bytes: getDiscriminator("channelAccount"),
           },
         },
       ];
@@ -272,7 +272,7 @@ export class DiscoveryService extends BaseService {
           creator: account.creator,
           name: account.name,
           description: account.description,
-          visibility: this.convertChannelVisibilityFromProgram(account.visibility),
+          visibility: convertChannelVisibilityFromProgram(account.visibility),
           maxParticipants: account.maxParticipants,
           participantCount: account.currentParticipants,
           currentParticipants: account.currentParticipants,
@@ -285,10 +285,10 @@ export class DiscoveryService extends BaseService {
       });
 
       // Apply in-memory filters
-      channels = this.applyChannelFilters(channels, filters);
+      channels = applyChannelFilters(channels, filters);
       
       // Apply sorting
-      channels = this.sortChannels(channels, filters);
+      channels = sortChannels(channels, filters);
 
       // Apply pagination
       const offset = filters.offset || 0;
@@ -417,7 +417,7 @@ export class DiscoveryService extends BaseService {
     const similarities = agents.items
       .filter(agent => !agent.pubkey.equals(targetAgent.pubkey))
       .map(agent => {
-        const similarity = this.calculateCapabilitySimilarity(
+        const similarity = calculateCapabilitySimilarity(
           targetAgent.capabilities,
           agent.capabilities
         );
@@ -462,265 +462,205 @@ export class DiscoveryService extends BaseService {
       .map(item => item.channel);
   }
 
-  // ============================================================================
-  // Filter and Sort Helper Methods
-  // ============================================================================
-
-  private applyAgentFilters(agents: AgentAccount[], filters: AgentSearchFilters): AgentAccount[] {
-    return agents.filter(agent => {
-      // Capability filter
-      if (filters.capabilities && filters.capabilities.length > 0) {
-        const hasRequiredCapabilities = filters.capabilities.some(cap => 
-          hasCapability(agent.capabilities, cap)
-        );
-        if (!hasRequiredCapabilities) return false;
-      }
-
-      // Reputation filters
-      if (filters.minReputation !== undefined && agent.reputation < filters.minReputation) {
-        return false;
-      }
-      if (filters.maxReputation !== undefined && agent.reputation > filters.maxReputation) {
-        return false;
-      }
-
-      // Metadata filter
-      if (filters.metadataContains) {
-        const searchTerm = filters.metadataContains.toLowerCase();
-        if (!agent.metadataUri.toLowerCase().includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Time-based filters
-      if (filters.lastActiveAfter !== undefined && agent.lastUpdated * 1000 < filters.lastActiveAfter) {
-        return false;
-      }
-      if (filters.lastActiveBefore !== undefined && agent.lastUpdated * 1000 > filters.lastActiveBefore) {
-        return false;
-      }
-
-      return true;
-    });
-  }
-
-  private applyMessageFilters(messages: MessageAccount[], filters: MessageSearchFilters): MessageAccount[] {
-    return messages.filter(message => {
-      // Status filter
-      if (filters.status && filters.status.length > 0) {
-        if (!filters.status.includes(message.status)) return false;
-      }
-
-      // Message type filter
-      if (filters.messageType && filters.messageType.length > 0) {
-        if (!filters.messageType.includes(message.messageType)) return false;
-      }
-
-      // Payload content filter
-      if (filters.payloadContains) {
-        const searchTerm = filters.payloadContains.toLowerCase();
-        if (!message.payload.toLowerCase().includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Time-based filters
-      if (filters.createdAfter !== undefined && message.createdAt * 1000 < filters.createdAfter) {
-        return false;
-      }
-      if (filters.createdBefore !== undefined && message.createdAt * 1000 > filters.createdBefore) {
-        return false;
-      }
-
-      return true;
-    });
-  }
-
-  private applyChannelFilters(channels: ChannelAccount[], filters: ChannelSearchFilters): ChannelAccount[] {
-    return channels.filter(channel => {
-      // Visibility filter
-      if (filters.visibility && filters.visibility.length > 0) {
-        if (!filters.visibility.includes(channel.visibility)) return false;
-      }
-
-      // Name filter
-      if (filters.nameContains) {
-        const searchTerm = filters.nameContains.toLowerCase();
-        if (!channel.name.toLowerCase().includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Description filter
-      if (filters.descriptionContains) {
-        const searchTerm = filters.descriptionContains.toLowerCase();
-        if (!channel.description.toLowerCase().includes(searchTerm)) {
-          return false;
-        }
-      }
-
-      // Participant count filters
-      if (filters.minParticipants !== undefined && channel.participantCount < filters.minParticipants) {
-        return false;
-      }
-      if (filters.maxParticipants !== undefined && channel.participantCount > filters.maxParticipants) {
-        return false;
-      }
-
-      // Fee filter
-      if (filters.maxFeePerMessage !== undefined && channel.feePerMessage > filters.maxFeePerMessage) {
-        return false;
-      }
-
-      // Escrow filter
-      if (filters.hasEscrow !== undefined) {
-        const hasEscrow = channel.escrowBalance > 0;
-        if (filters.hasEscrow !== hasEscrow) return false;
-      }
-
-      // Time-based filters
-      if (filters.createdAfter !== undefined && channel.createdAt * 1000 < filters.createdAfter) {
-        return false;
-      }
-      if (filters.createdBefore !== undefined && channel.createdAt * 1000 > filters.createdBefore) {
-        return false;
-      }
-
-      return true;
-    });
-  }
-
-  private sortAgents(agents: AgentAccount[], filters: AgentSearchFilters): AgentAccount[] {
-    const sortBy = filters.sortBy || 'relevance';
-    const sortOrder = filters.sortOrder || 'desc';
-    
-    const sorted = [...agents].sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'reputation':
-          comparison = a.reputation - b.reputation;
-          break;
-        case 'recent':
-          comparison = a.lastUpdated - b.lastUpdated;
-          break;
-        case 'relevance':
-        default:
-          // Combine reputation and recent activity for relevance
-          comparison = (a.reputation * 0.7 + a.lastUpdated * 0.3) - (b.reputation * 0.7 + b.lastUpdated * 0.3);
-          break;
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-    
-    return sorted;
-  }
-
-  private sortMessages(messages: MessageAccount[], filters: MessageSearchFilters): MessageAccount[] {
-    const sortBy = filters.sortBy || 'recent';
-    const sortOrder = filters.sortOrder || 'desc';
-    
-    const sorted = [...messages].sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'recent':
-          comparison = a.timestamp - b.timestamp;
-          break;
-        case 'relevance':
-        default:
-          comparison = a.timestamp - b.timestamp;
-          break;
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-    
-    return sorted;
-  }
-
-  private sortChannels(channels: ChannelAccount[], filters: ChannelSearchFilters): ChannelAccount[] {
-    const sortBy = filters.sortBy || 'popular';
-    const sortOrder = filters.sortOrder || 'desc';
-    
-    const sorted = [...channels].sort((a, b) => {
-      let comparison = 0;
-      
-      switch (sortBy) {
-        case 'popular':
-          comparison = a.participantCount - b.participantCount;
-          break;
-        case 'recent':
-          comparison = a.createdAt - b.createdAt;
-          break;
-        case 'relevance':
-        default:
-          // Combine popularity and recent activity
-          comparison = (a.participantCount * 0.7 + a.createdAt * 0.3) - (b.participantCount * 0.7 + b.createdAt * 0.3);
-          break;
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-    
-    return sorted;
-  }
-
-  private calculateCapabilitySimilarity(caps1: number, caps2: number): number {
-    // Calculate Jaccard similarity for capability sets
-    const intersection = caps1 & caps2;
-    const union = caps1 | caps2;
-    
-    if (union === 0) return 0;
-    
-    // Count the number of set bits
-    const intersectionCount = this.countSetBits(intersection);
-    const unionCount = this.countSetBits(union);
-    
-    return intersectionCount / unionCount;
-  }
-
-  private countSetBits(n: number): number {
-    let count = 0;
-    while (n) {
-      count += n & 1;
-      n >>= 1;
-    }
-    return count;
-  }
-
-  private getDiscriminator(accountType: string): string {
-    // This would need to be implemented based on your IDL
-    const discriminators: Record<string, string> = {
-      agentAccount: "6RdcqmKGhkRy",
-      messageAccount: "6RdcqmKGhkRz", 
-      channelAccount: "6RdcqmKGhkRA",
-      escrowAccount: "6RdcqmKGhkRB",
-    };
-    return discriminators[accountType] || "";
-  }
-
-  private convertMessageTypeFromProgram(programType: any): MessageType {
-    if (programType.text !== undefined) return MessageType.Text;
-    if (programType.data !== undefined) return MessageType.Data;
-    if (programType.command !== undefined) return MessageType.Command;
-    if (programType.response !== undefined) return MessageType.Response;
-    if (programType.custom !== undefined) return MessageType.Custom;
-    return MessageType.Text;
-  }
-
-  private convertMessageStatusFromProgram(programStatus: any): MessageStatus {
-    if (programStatus.pending) return MessageStatus.Pending;
-    if (programStatus.delivered) return MessageStatus.Delivered;
-    if (programStatus.read) return MessageStatus.Read;
-    if (programStatus.failed) return MessageStatus.Failed;
-    return MessageStatus.Pending;
-  }
-
-  private convertChannelVisibilityFromProgram(programVisibility: any): ChannelVisibility {
-    if (programVisibility.public !== undefined) return ChannelVisibility.Public;
-    if (programVisibility.private !== undefined) return ChannelVisibility.Private;
-    return ChannelVisibility.Public;
-  }
 }
+// ---------------------------------------------------------------------------
+// Helper functions extracted from DiscoveryService
+// ---------------------------------------------------------------------------
+function applyAgentFilters(agents: AgentAccount[], filters: AgentSearchFilters): AgentAccount[] {
+  return agents.filter(agent => {
+    if (filters.capabilities && filters.capabilities.length > 0) {
+      const hasRequiredCapabilities = filters.capabilities.some(cap => hasCapability(agent.capabilities, cap));
+      if (!hasRequiredCapabilities) return false;
+    }
+    if (filters.minReputation !== undefined && agent.reputation < filters.minReputation) {
+      return false;
+    }
+    if (filters.maxReputation !== undefined && agent.reputation > filters.maxReputation) {
+      return false;
+    }
+    if (filters.metadataContains) {
+      const searchTerm = filters.metadataContains.toLowerCase();
+      if (!agent.metadataUri.toLowerCase().includes(searchTerm)) return false;
+    }
+    if (filters.lastActiveAfter !== undefined && agent.lastUpdated * 1000 < filters.lastActiveAfter) {
+      return false;
+    }
+    if (filters.lastActiveBefore !== undefined && agent.lastUpdated * 1000 > filters.lastActiveBefore) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function applyMessageFilters(messages: MessageAccount[], filters: MessageSearchFilters): MessageAccount[] {
+  return messages.filter(message => {
+    if (filters.status && filters.status.length > 0) {
+      if (!filters.status.includes(message.status)) return false;
+    }
+    if (filters.messageType && filters.messageType.length > 0) {
+      if (!filters.messageType.includes(message.messageType)) return false;
+    }
+    if (filters.payloadContains) {
+      const searchTerm = filters.payloadContains.toLowerCase();
+      if (!message.payload.toLowerCase().includes(searchTerm)) return false;
+    }
+    if (filters.createdAfter !== undefined && message.createdAt * 1000 < filters.createdAfter) {
+      return false;
+    }
+    if (filters.createdBefore !== undefined && message.createdAt * 1000 > filters.createdBefore) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function applyChannelFilters(channels: ChannelAccount[], filters: ChannelSearchFilters): ChannelAccount[] {
+  return channels.filter(channel => {
+    if (filters.visibility && filters.visibility.length > 0) {
+      if (!filters.visibility.includes(channel.visibility)) return false;
+    }
+    if (filters.nameContains) {
+      const searchTerm = filters.nameContains.toLowerCase();
+      if (!channel.name.toLowerCase().includes(searchTerm)) return false;
+    }
+    if (filters.descriptionContains) {
+      const searchTerm = filters.descriptionContains.toLowerCase();
+      if (!channel.description.toLowerCase().includes(searchTerm)) return false;
+    }
+    if (filters.minParticipants !== undefined && channel.participantCount < filters.minParticipants) {
+      return false;
+    }
+    if (filters.maxParticipants !== undefined && channel.participantCount > filters.maxParticipants) {
+      return false;
+    }
+    if (filters.maxFeePerMessage !== undefined && channel.feePerMessage > filters.maxFeePerMessage) {
+      return false;
+    }
+    if (filters.hasEscrow !== undefined) {
+      const hasEscrow = channel.escrowBalance > 0;
+      if (filters.hasEscrow !== hasEscrow) return false;
+    }
+    if (filters.createdAfter !== undefined && channel.createdAt * 1000 < filters.createdAfter) {
+      return false;
+    }
+    if (filters.createdBefore !== undefined && channel.createdAt * 1000 > filters.createdBefore) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function sortAgents(agents: AgentAccount[], filters: AgentSearchFilters): AgentAccount[] {
+  const sortBy = filters.sortBy || 'relevance';
+  const sortOrder = filters.sortOrder || 'desc';
+  const sorted = [...agents].sort((a, b) => {
+    let comparison = 0;
+    switch (sortBy) {
+      case 'reputation':
+        comparison = a.reputation - b.reputation;
+        break;
+      case 'recent':
+        comparison = a.lastUpdated - b.lastUpdated;
+        break;
+      case 'relevance':
+      default:
+        comparison = (a.reputation * 0.7 + a.lastUpdated * 0.3) - (b.reputation * 0.7 + b.lastUpdated * 0.3);
+        break;
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+  return sorted;
+}
+
+function sortMessages(messages: MessageAccount[], filters: MessageSearchFilters): MessageAccount[] {
+  const sortBy = filters.sortBy || 'recent';
+  const sortOrder = filters.sortOrder || 'desc';
+  const sorted = [...messages].sort((a, b) => {
+    let comparison = 0;
+    switch (sortBy) {
+      case 'recent':
+        comparison = a.timestamp - b.timestamp;
+        break;
+      case 'relevance':
+      default:
+        comparison = a.timestamp - b.timestamp;
+        break;
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+  return sorted;
+}
+
+function sortChannels(channels: ChannelAccount[], filters: ChannelSearchFilters): ChannelAccount[] {
+  const sortBy = filters.sortBy || 'popular';
+  const sortOrder = filters.sortOrder || 'desc';
+  const sorted = [...channels].sort((a, b) => {
+    let comparison = 0;
+    switch (sortBy) {
+      case 'popular':
+        comparison = a.participantCount - b.participantCount;
+        break;
+      case 'recent':
+        comparison = a.createdAt - b.createdAt;
+        break;
+      case 'relevance':
+      default:
+        comparison = (a.participantCount * 0.7 + a.createdAt * 0.3) - (b.participantCount * 0.7 + b.createdAt * 0.3);
+        break;
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+  return sorted;
+}
+
+function calculateCapabilitySimilarity(caps1: number, caps2: number): number {
+  const intersection = caps1 & caps2;
+  const union = caps1 | caps2;
+  if (union === 0) return 0;
+  const intersectionCount = countSetBits(intersection);
+  const unionCount = countSetBits(union);
+  return intersectionCount / unionCount;
+}
+
+function countSetBits(n: number): number {
+  let count = 0;
+  while (n) {
+    count += n & 1;
+    n >>= 1;
+  }
+  return count;
+}
+
+function getDiscriminator(accountType: string): string {
+  const discriminators: Record<string, string> = {
+    agentAccount: '6RdcqmKGhkRy',
+    messageAccount: '6RdcqmKGhkRz',
+    channelAccount: '6RdcqmKGhkRA',
+    escrowAccount: '6RdcqmKGhkRB'
+  };
+  return discriminators[accountType] || '';
+}
+
+function convertMessageTypeFromProgram(programType: any): MessageType {
+  if (programType.text !== undefined) return MessageType.Text;
+  if (programType.data !== undefined) return MessageType.Data;
+  if (programType.command !== undefined) return MessageType.Command;
+  if (programType.response !== undefined) return MessageType.Response;
+  if (programType.custom !== undefined) return MessageType.Custom;
+  return MessageType.Text;
+}
+
+function convertMessageStatusFromProgram(programStatus: any): MessageStatus {
+  if (programStatus.pending) return MessageStatus.Pending;
+  if (programStatus.delivered) return MessageStatus.Delivered;
+  if (programStatus.read) return MessageStatus.Read;
+  if (programStatus.failed) return MessageStatus.Failed;
+  return MessageStatus.Pending;
+}
+
+function convertChannelVisibilityFromProgram(programVisibility: any): ChannelVisibility {
+  if (programVisibility.public !== undefined) return ChannelVisibility.Public;
+  if (programVisibility.private !== undefined) return ChannelVisibility.Private;
+  return ChannelVisibility.Public;
+}
+

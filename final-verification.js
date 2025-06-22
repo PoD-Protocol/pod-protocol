@@ -109,50 +109,49 @@ async function checkCodeContains(filePath, searchText, description) {
   }
 }
 
-async function verifyImplementation() {
-  logHeader('PoD Protocol Complete Implementation Verification');
-  
-  let totalChecks = 0;
-  let passedChecks = 0;
-  
-  const check = (condition, description) => {
-    totalChecks++;
-    if (condition) {
-      passedChecks++;
-      logSuccess(description);
-    } else {
-      log('red', `❌ ${description}`);
-    }
-    return condition;
-  };
+// ---------------------------------------------------------------------------
+// Helper utilities for verification
+// ---------------------------------------------------------------------------
 
-  // ============================================================================
-  // 1. PROJECT STRUCTURE AND BUILD VERIFICATION
-  // ============================================================================
+function createTracker() {
+  let total = 0;
+  let passed = 0;
+  return {
+    check(condition, description) {
+      total++;
+      if (condition) {
+        passed++;
+        logSuccess(description);
+      } else {
+        log('red', `❌ ${description}`);
+      }
+      return condition;
+    },
+    stats() {
+      return { total, passed };
+    }
+  };
+}
+
+async function verifyProjectStructure(check) {
   logSection('1. Project Structure and Build Verification');
-  
-  // Check that all new files exist
   const newFiles = [
     'sdk/src/services/analytics.ts',
-    'sdk/src/services/discovery.ts', 
+    'sdk/src/services/discovery.ts',
     'cli/src/commands/analytics.ts',
     'cli/src/commands/discovery.ts',
     'sdk/dist/index.js',
     'sdk/dist/index.esm.js',
     'cli/dist/index.js'
   ];
-  
   for (const file of newFiles) {
-    const exists = await checkFileExists(file, `New implementation file`);
+    const exists = await checkFileExists(file, 'New implementation file');
     check(exists, `${file} exists`);
   }
-  
-  // ============================================================================
-  // 2. SDK SERVICES VERIFICATION
-  // ============================================================================
+}
+
+async function verifySdkServices(check) {
   logSection('2. SDK Services Implementation Verification');
-  
-  // Check Analytics Service implementation
   const analyticsChecks = [
     { file: 'sdk/src/services/analytics.ts', text: 'export class AnalyticsService', desc: 'AnalyticsService class' },
     { file: 'sdk/src/services/analytics.ts', text: 'getDashboard', desc: 'Dashboard functionality' },
@@ -161,13 +160,11 @@ async function verifyImplementation() {
     { file: 'sdk/src/services/analytics.ts', text: 'getChannelAnalytics', desc: 'Channel analytics' },
     { file: 'sdk/src/services/analytics.ts', text: 'generateReport', desc: 'Report generation' }
   ];
-  
   for (const { file, text, desc } of analyticsChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `Analytics: ${desc}`);
   }
-  
-  // Check Discovery Service implementation
+
   const discoveryChecks = [
     { file: 'sdk/src/services/discovery.ts', text: 'export class DiscoveryService', desc: 'DiscoveryService class' },
     { file: 'sdk/src/services/discovery.ts', text: 'searchAgents', desc: 'Agent search functionality' },
@@ -176,13 +173,11 @@ async function verifyImplementation() {
     { file: 'sdk/src/services/discovery.ts', text: 'getRecommendedAgents', desc: 'Agent recommendations' },
     { file: 'sdk/src/services/discovery.ts', text: 'getTrendingChannels', desc: 'Trending channels' }
   ];
-  
   for (const { file, text, desc } of discoveryChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `Discovery: ${desc}`);
   }
-  
-  // Check Enhanced Utils implementation
+
   const utilsChecks = [
     { file: 'sdk/src/utils.ts', text: 'findParticipantPDA', desc: 'Participant PDA calculation' },
     { file: 'sdk/src/utils.ts', text: 'findInvitationPDA', desc: 'Invitation PDA calculation' },
@@ -192,18 +187,14 @@ async function verifyImplementation() {
     { file: 'sdk/src/utils.ts', text: 'formatDuration', desc: 'Duration formatting' },
     { file: 'sdk/src/utils.ts', text: 'formatBytes', desc: 'Bytes formatting' }
   ];
-  
   for (const { file, text, desc } of utilsChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `Utils: ${desc}`);
   }
-  
-  // ============================================================================
-  // 3. CLI COMMANDS VERIFICATION
-  // ============================================================================
+}
+
+async function verifyCliCommands(check) {
   logSection('3. CLI Commands Implementation Verification');
-  
-  // Check Analytics CLI implementation
   const analyticsCliChecks = [
     { file: 'cli/src/commands/analytics.ts', text: 'export class AnalyticsCommands', desc: 'AnalyticsCommands class' },
     { file: 'cli/src/commands/analytics.ts', text: 'dashboard', desc: 'Dashboard command' },
@@ -211,13 +202,11 @@ async function verifyImplementation() {
     { file: 'cli/src/commands/analytics.ts', text: 'trending', desc: 'Trending command' },
     { file: 'cli/src/commands/analytics.ts', text: 'report', desc: 'Report generation command' }
   ];
-  
   for (const { file, text, desc } of analyticsCliChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `Analytics CLI: ${desc}`);
   }
-  
-  // Check Discovery CLI implementation  
+
   const discoveryCliChecks = [
     { file: 'cli/src/commands/discovery.ts', text: 'export class DiscoveryCommands', desc: 'DiscoveryCommands class' },
     { file: 'cli/src/commands/discovery.ts', text: 'searchAgents', desc: 'Agent search command' },
@@ -225,49 +214,39 @@ async function verifyImplementation() {
     { file: 'cli/src/commands/discovery.ts', text: 'recommend', desc: 'Recommendation command' },
     { file: 'cli/src/commands/discovery.ts', text: 'interactive', desc: 'Interactive search' }
   ];
-  
   for (const { file, text, desc } of discoveryCliChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `Discovery CLI: ${desc}`);
   }
-  
-  // ============================================================================
-  // 4. INTEGRATION VERIFICATION
-  // ============================================================================
+}
+
+async function verifyIntegration(check) {
   logSection('4. Integration and Export Verification');
-  
-  // Check that services are integrated into main client
   const integrationChecks = [
     { file: 'sdk/src/client.ts', text: 'analytics: AnalyticsService', desc: 'Analytics service integration' },
     { file: 'sdk/src/client.ts', text: 'discovery: DiscoveryService', desc: 'Discovery service integration' },
     { file: 'sdk/src/client.ts', text: 'this.analytics = new AnalyticsService', desc: 'Analytics service initialization' },
     { file: 'sdk/src/client.ts', text: 'this.discovery = new DiscoveryService', desc: 'Discovery service initialization' }
   ];
-  
   for (const { file, text, desc } of integrationChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `Integration: ${desc}`);
   }
-  
-  // Check CLI command registration
+
   const cliIntegrationChecks = [
     { file: 'cli/src/index.ts', text: 'AnalyticsCommands', desc: 'Analytics commands import' },
     { file: 'cli/src/index.ts', text: 'DiscoveryCommands', desc: 'Discovery commands import' },
     { file: 'cli/src/index.ts', text: 'analyticsCommands.register', desc: 'Analytics commands registration' },
     { file: 'cli/src/index.ts', text: 'discoveryCommands.register', desc: 'Discovery commands registration' }
   ];
-  
   for (const { file, text, desc } of cliIntegrationChecks) {
     const found = await checkCodeContains(file, text, desc);
     check(found, `CLI Integration: ${desc}`);
   }
-  
-  // ============================================================================
-  // 5. FUNCTIONAL CLI TESTING
-  // ============================================================================
+}
+
+async function runCliTests(check) {
   logSection('5. Functional CLI Testing');
-  
-  // Test basic CLI functionality
   const cliTests = [
     { cmd: 'cd cli && node dist/index.js --help', desc: 'Main CLI help' },
     { cmd: 'cd cli && node dist/index.js analytics --help', desc: 'Analytics command help' },
@@ -276,53 +255,38 @@ async function verifyImplementation() {
     { cmd: 'cd cli && node dist/index.js discover agents --help', desc: 'Discovery agents help' },
     { cmd: 'cd cli && node dist/index.js discover channels --help', desc: 'Discovery channels help' }
   ];
-  
   for (const { cmd, desc } of cliTests) {
     const result = await runCommand(cmd, desc);
     check(result.success, `CLI Test: ${desc}`);
   }
-  
-  // ============================================================================
-  // 6. SDK FUNCTIONALITY TESTING
-  // ============================================================================
+}
+
+async function runSdkTests(check) {
   logSection('6. SDK Functionality Testing');
-  
-  // Test that SDK can be imported and used
   try {
     logInfo('Testing SDK import and basic functionality...');
     const { execSync } = await import('child_process');
-    const testResult = execSync('node test-implementation.js', { 
-      encoding: 'utf8',
-      timeout: 30000 
-    });
-    
-    // Check for success indicators in test output
+    const testResult = execSync('node test-implementation.js', { encoding: 'utf8', timeout: 30000 });
     const hasSuccess = testResult.includes('🎉 ALL IMPLEMENTATIONS VERIFIED SUCCESSFULLY!');
     const hasStats = testResult.includes('Success Rate: 100%');
-    
     check(hasSuccess, 'SDK comprehensive test suite passed');
     check(hasStats, 'All SDK functionality tests passed');
-    
   } catch (error) {
     check(false, `SDK functionality test failed: ${error.message.slice(0, 100)}...`);
   }
-  
-  // ============================================================================
-  // 7. CODE QUALITY VERIFICATION
-  // ============================================================================
+}
+
+async function verifyCodeQuality(check) {
   logSection('7. Code Quality and Type Safety Verification');
-  
-  // Check that builds succeed
   try {
     logInfo('Testing TypeScript compilation...');
     execSync('cd sdk && bun run build:prod', { timeout: 30000 });
     check(true, 'SDK TypeScript compilation successful');
   } catch (error) {
-    // Build succeeds but with warnings, that's acceptable
     const hasWarnings = error.message.includes('(!) [plugin typescript]');
     check(hasWarnings, 'SDK compilation with acceptable warnings');
   }
-  
+
   try {
     logInfo('Testing CLI TypeScript compilation...');
     execSync('cd cli && bun run build:prod', { timeout: 30000 });
@@ -330,20 +294,17 @@ async function verifyImplementation() {
   } catch (error) {
     check(false, `CLI compilation failed: ${error.message.slice(0, 100)}...`);
   }
-  
-  // ============================================================================
-  // FINAL RESULTS
-  // ============================================================================
+}
+
+function displayResults(stats) {
   logHeader('Implementation Verification Results');
-  
-  const successRate = ((passedChecks / totalChecks) * 100).toFixed(1);
-  
+  const successRate = ((stats.passed / stats.total) * 100).toFixed(1);
   log('cyan', `📊 VERIFICATION STATISTICS:`);
-  log('cyan', `   • Total Checks: ${totalChecks}`);
-  log('cyan', `   • Passed: ${passedChecks}`);
-  log('cyan', `   • Failed: ${totalChecks - passedChecks}`);
+  log('cyan', `   • Total Checks: ${stats.total}`);
+  log('cyan', `   • Passed: ${stats.passed}`);
+  log('cyan', `   • Failed: ${stats.total - stats.passed}`);
   log('cyan', `   • Success Rate: ${successRate}%`);
-  
+
   if (successRate >= 90) {
     log('green', '\n🎉 IMPLEMENTATION VERIFICATION SUCCESSFUL!');
     log('green', '\n✅ COMPREHENSIVE FEATURE IMPLEMENTATION CONFIRMED:');
@@ -357,30 +318,38 @@ async function verifyImplementation() {
     log('green', '   ▶ Network resilience with retry mechanisms');
     log('green', '   ▶ Multi-format outputs and reporting');
     log('green', '   ▶ Production-ready code architecture');
-    
     log('magenta', '\n🚀 PROOF OF WORKING END-TO-END IMPLEMENTATION:');
     log('magenta', '   ✓ All builds compile successfully');
-    log('magenta', '   ✓ All services integrate correctly'); 
+    log('magenta', '   ✓ All services integrate correctly');
     log('magenta', '   ✓ All CLI commands function properly');
     log('magenta', '   ✓ All utility functions work as expected');
     log('magenta', '   ✓ Comprehensive test suite passes 100%');
     log('magenta', '   ✓ Type safety maintained throughout');
     log('magenta', '   ✓ Error handling works correctly');
     log('magenta', '   ✓ No breaking changes to existing functionality');
-    
     log('cyan', '\n🎯 MISSION ACCOMPLISHED:');
     log('cyan', '   The PoD Protocol now has a complete, feature-rich,');
     log('cyan', '   production-ready SDK and CLI implementation with');
     log('cyan', '   comprehensive analytics, discovery, and enhanced');
     log('cyan', '   functionality that rivals modern blockchain tooling.');
-    
   } else {
     log('yellow', '\n⚠️  IMPLEMENTATION PARTIALLY VERIFIED');
     log('yellow', `   Some checks failed but core functionality works (${successRate}% pass rate)`);
   }
-  
   console.log('\n');
 }
 
-// Run verification
+async function verifyImplementation() {
+  logHeader('PoD Protocol Complete Implementation Verification');
+  const tracker = createTracker();
+  await verifyProjectStructure(tracker.check);
+  await verifySdkServices(tracker.check);
+  await verifyCliCommands(tracker.check);
+  await verifyIntegration(tracker.check);
+  await runCliTests(tracker.check);
+  await runSdkTests(tracker.check);
+  await verifyCodeQuality(tracker.check);
+  displayResults(tracker.stats());
+}
+
 verifyImplementation().catch(console.error);
