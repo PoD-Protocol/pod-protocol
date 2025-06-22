@@ -1,6 +1,7 @@
 import { create, IPFSHTTPClient } from 'ipfs-http-client';
 import { CID } from 'multiformats/cid';
 import { BaseService, BaseServiceConfig } from './base.js';
+import { AppError } from '../errors';
 
 /**
  * IPFS configuration options
@@ -134,7 +135,12 @@ export class IPFSService extends BaseService {
         url: `https://ipfs.io/ipfs/${result.cid.toString()}`,
       };
     } catch (error) {
-      throw new Error(`Failed to store data on IPFS: ${error}`);
+      throw new AppError(
+        'IPFS_STORE_FAILED',
+        500,
+        `Failed to store data on IPFS: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -166,7 +172,12 @@ export class IPFSService extends BaseService {
         url: `https://ipfs.io/ipfs/${result.cid.toString()}`,
       };
     } catch (error) {
-      throw new Error(`Failed to store file on IPFS: ${error}`);
+      throw new AppError(
+        'IPFS_STORE_FILE_FAILED',
+        500,
+        `Failed to store file on IPFS: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -184,7 +195,12 @@ export class IPFSService extends BaseService {
       const data = Buffer.concat(chunks).toString('utf-8');
       return JSON.parse(data) as T;
     } catch (error) {
-      throw new Error(`Failed to retrieve data from IPFS: ${error}`);
+      throw new AppError(
+        'IPFS_RETRIEVE_FAILED',
+        500,
+        `Failed to retrieve data from IPFS: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -215,7 +231,12 @@ export class IPFSService extends BaseService {
 
       return Buffer.concat(chunks);
     } catch (error) {
-      throw new Error(`Failed to retrieve file from IPFS: ${error}`);
+      throw new AppError(
+        'IPFS_RETRIEVE_FILE_FAILED',
+        500,
+        `Failed to retrieve file from IPFS: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -226,7 +247,12 @@ export class IPFSService extends BaseService {
     try {
       await this.client.pin.add(hash);
     } catch (error) {
-      throw new Error(`Failed to pin content: ${error}`);
+      throw new AppError(
+        'IPFS_PIN_FAILED',
+        500,
+        `Failed to pin content: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -237,7 +263,12 @@ export class IPFSService extends BaseService {
     try {
       await this.client.pin.rm(hash);
     } catch (error) {
-      throw new Error(`Failed to unpin content: ${error}`);
+      throw new AppError(
+        'IPFS_UNPIN_FAILED',
+        500,
+        `Failed to unpin content: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -248,7 +279,12 @@ export class IPFSService extends BaseService {
     try {
       return await this.client.id();
     } catch (error) {
-      throw new Error(`Failed to get IPFS node info: ${error}`);
+      throw new AppError(
+        'IPFS_NODE_INFO_FAILED',
+        500,
+        `Failed to get IPFS node info: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 

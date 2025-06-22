@@ -1,5 +1,6 @@
 import { PublicKey, GetProgramAccountsFilter } from "@solana/web3.js";
 import { BaseService } from "./base";
+import { AppError } from "../errors";
 import {
   AgentAccount,
   MessageAccount,
@@ -148,7 +149,12 @@ export class DiscoveryService extends BaseService {
         executionTime: Date.now() - startTime,
       };
     } catch (error: any) {
-      throw new Error(`Agent search failed: ${error.message}`);
+      throw new AppError(
+        "AGENT_SEARCH_FAILED",
+        500,
+        `Agent search failed: ${error.message}`,
+        error,
+      );
     }
   }
 
@@ -237,7 +243,12 @@ export class DiscoveryService extends BaseService {
         executionTime: Date.now() - startTime,
       };
     } catch (error: any) {
-      throw new Error(`Message search failed: ${error.message}`);
+      throw new AppError(
+        "MESSAGE_SEARCH_FAILED",
+        500,
+        `Message search failed: ${error.message}`,
+        error,
+      );
     }
   }
 
@@ -320,7 +331,12 @@ export class DiscoveryService extends BaseService {
         executionTime: Date.now() - startTime,
       };
     } catch (error: any) {
-      throw new Error(`Channel search failed: ${error.message}`);
+      throw new AppError(
+        "CHANNEL_SEARCH_FAILED",
+        500,
+        `Channel search failed: ${error.message}`,
+        error,
+      );
     }
   }
 

@@ -95,5 +95,8 @@ export {
   retry,
 } from "./utils";
 
+// Errors
+export { AppError, ValidationError, MessageExpiredError } from "./errors";
+
 // Re-export commonly used Solana types for convenience
 export type { PublicKey, Signer, Connection } from "@solana/web3.js";

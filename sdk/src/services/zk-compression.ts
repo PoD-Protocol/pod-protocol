@@ -2,6 +2,7 @@ import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { AnchorProvider } from '@coral-xyz/anchor';
 import { BaseService, BaseServiceConfig } from './base.js';
 import { IPFSService, IPFSStorageResult } from './ipfs.js';
+import { AppError } from '../errors';
 
 /**
  * Light Protocol SDK types (placeholder - would be from actual light-protocol-sdk)
@@ -158,7 +159,12 @@ export class ZKCompressionService extends BaseService {
         return await this.processCompressedMessage(compressedMessage, ipfsResult);
       }
     } catch (error) {
-      throw new Error(`Failed to broadcast compressed message: ${error}`);
+      throw new AppError(
+        'COMPRESSED_BROADCAST_FAILED',
+        500,
+        `Failed to broadcast compressed message: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -213,7 +219,12 @@ export class ZKCompressionService extends BaseService {
         compressedAccount: { hash: '', data: compressedParticipant },
       };
     } catch (error) {
-      throw new Error(`Failed to join channel with compression: ${error}`);
+      throw new AppError(
+        'JOIN_COMPRESSION_FAILED',
+        500,
+        `Failed to join channel with compression: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -227,7 +238,11 @@ export class ZKCompressionService extends BaseService {
   ): Promise<BatchCompressionResult> {
     try {
       if (messageHashes.length > 100) {
-        throw new Error('Batch size too large. Maximum 100 messages per batch.');
+        throw new AppError(
+          'BATCH_TOO_LARGE',
+          400,
+          'Batch size too large. Maximum 100 messages per batch.',
+        );
       }
 
       const program = this.ensureInitialized();
@@ -257,7 +272,12 @@ export class ZKCompressionService extends BaseService {
         merkleRoot: '', // Would be populated from Light Protocol response
       };
     } catch (error) {
-      throw new Error(`Failed to batch sync messages: ${error}`);
+      throw new AppError(
+        'BATCH_SYNC_FAILED',
+        500,
+        `Failed to batch sync messages: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -296,13 +316,18 @@ export class ZKCompressionService extends BaseService {
       );
 
       if (!response.ok) {
-        throw new Error(`Indexer query failed: ${response.statusText}`);
+        throw new AppError('INDEXER_QUERY_FAILED', response.status, `Indexer query failed: ${response.statusText}`);
       }
 
       const data = await response.json() as any;
       return data.messages || [];
     } catch (error) {
-      throw new Error(`Failed to query compressed messages: ${error}`);
+      throw new AppError(
+        'QUERY_COMPRESSED_FAILED',
+        500,
+        `Failed to query compressed messages: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -321,7 +346,7 @@ export class ZKCompressionService extends BaseService {
       );
 
       if (!response.ok) {
-        throw new Error(`Stats query failed: ${response.statusText}`);
+        throw new AppError('STATS_QUERY_FAILED', response.status, `Stats query failed: ${response.statusText}`);
       }
 
       const data = await response.json() as any;
@@ -332,7 +357,12 @@ export class ZKCompressionService extends BaseService {
         compressionRatio: data.compressionRatio || 1.0
       };
     } catch (error) {
-      throw new Error(`Failed to get channel stats: ${error}`);
+      throw new AppError(
+        'CHANNEL_STATS_FAILED',
+        500,
+        `Failed to get channel stats: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -352,7 +382,12 @@ export class ZKCompressionService extends BaseService {
 
       return { content, verified };
     } catch (error) {
-      throw new Error(`Failed to retrieve and verify message content: ${error}`);
+      throw new AppError(
+        'VERIFY_CONTENT_FAILED',
+        500,
+        `Failed to retrieve and verify message content: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -418,7 +453,12 @@ export class ZKCompressionService extends BaseService {
         compressedAccount: { hash: '', data: message },
       };
     } catch (error) {
-      throw new Error(`Failed to process compressed message: ${error}`);
+      throw new AppError(
+        'PROCESS_COMPRESSED_FAILED',
+        500,
+        `Failed to process compressed message: ${error}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 

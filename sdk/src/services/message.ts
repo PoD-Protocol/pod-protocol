@@ -6,6 +6,8 @@ import {
 } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 import { BaseService } from "./base";
+import { z } from "zod";
+import { AppError, MessageExpiredError } from "../errors";
 import {
   MessageAccount,
   SendMessageOptions,
@@ -23,6 +25,22 @@ import {
   getAccountCreatedAt,
 } from "../utils";
 
+const MessageSchema = z.object({
+  id: z.string().uuid(),
+  sender: z.string().min(1),
+  recipient: z.string().min(1),
+  body: z.string().nonempty(),
+  ttlSeconds: z.number().int().positive(),
+});
+
+const messageStore = new Map<string, any>();
+const db = {
+  save: async (msg: any) => {
+    messageStore.set(msg.id, msg);
+  },
+  find: async (id: string) => messageStore.get(id),
+};
+
 /**
  * Message-related operations service
  */
@@ -31,6 +49,10 @@ export class MessageService extends BaseService {
     wallet: Signer,
     options: SendMessageOptions,
   ): Promise<string> {
+    const msg = MessageSchema.parse(options as any);
+    const expiresAt = new Date(Date.now() + msg.ttlSeconds * 1000);
+    await db.save({ ...msg, expiresAt });
+
     const program = this.ensureInitialized();
 
     // Derive sender agent PDA
@@ -94,16 +116,10 @@ export class MessageService extends BaseService {
     });
   }
 
-  async getMessage(messagePDA: PublicKey): Promise<MessageAccount | null> {
-    try {
-      const account = await this.getAccount("messageAccount").fetch(messagePDA);
-      return this.convertMessageAccountFromProgram(account, messagePDA);
-    } catch (error: any) {
-      if (error?.message?.includes("Account does not exist")) {
-        return null;
-      }
-      throw error;
-    }
+  async getMessage(id: string): Promise<any> {
+    const msg = await db.find(id);
+    if (!msg || msg.expiresAt < new Date()) throw new MessageExpiredError(id);
+    return msg;
   }
 
   async getAgentMessages(
@@ -147,7 +163,12 @@ export class MessageService extends BaseService {
         return this.convertMessageAccountFromProgram(account, acc.pubkey);
       });
     } catch (error: any) {
-      throw new Error(`Failed to fetch agent messages: ${error.message}`);
+      throw new AppError(
+        "FETCH_AGENT_MESSAGES_FAILED",
+        500,
+        `Failed to fetch agent messages: ${error.message}`,
+        error,
+      );
     }
   }
 
@@ -178,7 +199,11 @@ export class MessageService extends BaseService {
       case MessageStatus.Failed:
         return { failed: {} };
       default:
-        throw new Error(`Unknown message status: ${status}`);
+        throw new AppError(
+          "UNKNOWN_STATUS",
+          400,
+          `Unknown message status: ${status}`,
+        );
     }
   }
 
@@ -187,7 +212,11 @@ export class MessageService extends BaseService {
     if (programStatus.delivered) return MessageStatus.Delivered;
     if (programStatus.read) return MessageStatus.Read;
     if (programStatus.failed) return MessageStatus.Failed;
-    throw new Error(`Unknown program status: ${JSON.stringify(programStatus)}`);
+    throw new AppError(
+      "UNKNOWN_STATUS",
+      400,
+      `Unknown program status: ${JSON.stringify(programStatus)}`,
+    );
   }
 
   private convertMessageAccountFromProgram(
