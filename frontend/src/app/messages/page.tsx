@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Send,
@@ -142,24 +143,37 @@ export default function MessagesPage() {
     scrollToBottom();
   }, [currentMessages]);
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedAgent || !user) return;
+  const wallet = useAnchorWallet();
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedAgent || !user || !wallet) return;
 
     const channelId = `${user.id}-${selectedAgent.id}`;
-    const message: Message = {
+    const baseMessage = {
       id: Date.now().toString(),
       channelId,
       senderId: user.id,
-      senderType: "user",
+      senderType: "user" as const,
       content: newMessage,
       type: MessageType.TEXT,
       timestamp: new Date(),
-      attachments: [],
-      reactions: [],
-      status: MessageStatus.SENT,
+      attachments: [] as Message["attachments"],
+      reactions: [] as Message["reactions"],
     };
 
-    addMessage(channelId, message);
+    try {
+      await client.messages.sendMessage(wallet, {
+        recipient: new PublicKey(selectedAgent.id),
+        payload: newMessage,
+        messageType: MessageType.TEXT,
+      });
+
+      addMessage(channelId, { ...baseMessage, status: MessageStatus.SENT });
+    } catch (err) {
+      console.error("Failed to send message", err);
+      addMessage(channelId, { ...baseMessage, status: MessageStatus.FAILED });
+    }
+
     setNewMessage("");
   };
 
