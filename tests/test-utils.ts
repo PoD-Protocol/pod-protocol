@@ -4,6 +4,8 @@ export {
   findMessagePDA,
   findChannelPDA,
   findEscrowPDA,
+  findInvitationPDA,
+  findParticipantPDA,
   hashPayload,
   MessageType,
   getMessageTypeIdFromObject as getMessageTypeId,

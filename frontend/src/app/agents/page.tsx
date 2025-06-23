@@ -14,106 +14,50 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useStore from '../../components/store/useStore';
 import { Agent, AgentCategory, AgentStatus } from '../../components/store/types';
+import usePodClient from '../../hooks/usePodClient';
 
 const AgentsPage = () => {
-  const { agents, setAgents } = useStore();
+  const { agents, setAgents, setAgentsLoading, setAgentsError } = useStore();
+  const client = usePodClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<AgentCategory | 'all'>('all');
   const [sortBy, setSortBy] = useState<'reputation' | 'price' | 'recent'>('reputation');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Mock agents data
+  // Load agents from the protocol
   useEffect(() => {
-    const mockAgents: Agent[] = [
-      {
-        id: '1',
-        name: 'CodeMaster Pro',
-        description: 'Advanced coding assistant specializing in React, TypeScript, and Solana development. Can help with debugging, code reviews, and architecture decisions.',
-        avatar: '🤖',
-        owner: 'dev_master_123',
-        category: AgentCategory.CODING,
-        tags: ['React', 'TypeScript', 'Solana', 'Web3'],
-        pricing: {
-          type: 'usage',
-          amount: 0.1,
-          currency: 'SOL',
-        },
-        capabilities: ['Code Generation', 'Debugging', 'Code Review', 'Architecture Design'],
-        status: AgentStatus.ACTIVE,
-        reputation: 4.8,
-        totalInteractions: 1250,
-        createdAt: new Date('2024-01-15'),
-        updatedAt: new Date('2024-01-20'),
-        isVerified: true,
-      },
-      {
-        id: '2',
-        name: 'ContentCraft AI',
-        description: 'Creative writing assistant for blogs, marketing copy, and technical documentation. Specializes in engaging, SEO-optimized content.',
-        avatar: '✍️',
-        owner: 'content_creator_pro',
-        category: AgentCategory.WRITING,
-        tags: ['Content Writing', 'SEO', 'Marketing', 'Technical Docs'],
-        pricing: {
-          type: 'fixed',
-          amount: 0.05,
-          currency: 'SOL',
-        },
-        capabilities: ['Blog Writing', 'Marketing Copy', 'Technical Documentation', 'SEO Optimization'],
-        status: AgentStatus.ACTIVE,
-        reputation: 4.6,
-        totalInteractions: 890,
-        createdAt: new Date('2024-01-10'),
-        updatedAt: new Date('2024-01-18'),
-        isVerified: true,
-      },
-      {
-        id: '3',
-        name: 'DataViz Expert',
-        description: 'Data analysis and visualization specialist. Creates insightful charts, performs statistical analysis, and generates data-driven reports.',
-        avatar: '📊',
-        owner: 'data_scientist_ai',
-        category: AgentCategory.ANALYSIS,
-        tags: ['Data Analysis', 'Visualization', 'Statistics', 'Reports'],
-        pricing: {
-          type: 'subscription',
-          amount: 2.0,
-          currency: 'SOL',
-          billingPeriod: 'month',
-        },
-        capabilities: ['Data Analysis', 'Chart Creation', 'Statistical Modeling', 'Report Generation'],
-        status: AgentStatus.ACTIVE,
-        reputation: 4.9,
-        totalInteractions: 567,
-        createdAt: new Date('2024-01-05'),
-        updatedAt: new Date('2024-01-19'),
-        isVerified: true,
-      },
-      {
-        id: '4',
-        name: 'TradingBot Alpha',
-        description: 'Cryptocurrency trading analysis and strategy development. Provides market insights, technical analysis, and risk management advice.',
-        avatar: '📈',
-        owner: 'crypto_trader_pro',
-        category: AgentCategory.TRADING,
-        tags: ['Trading', 'Crypto', 'Technical Analysis', 'Risk Management'],
-        pricing: {
-          type: 'usage',
-          amount: 0.2,
-          currency: 'SOL',
-        },
-        capabilities: ['Market Analysis', 'Trading Strategies', 'Risk Assessment', 'Portfolio Optimization'],
-        status: AgentStatus.ACTIVE,
-        reputation: 4.4,
-        totalInteractions: 342,
-        createdAt: new Date('2024-01-12'),
-        updatedAt: new Date('2024-01-17'),
-        isVerified: false,
-      },
-    ];
-    
-    setAgents(mockAgents);
-  }, [setAgents]);
+    const loadAgents = async () => {
+      try {
+        setAgentsLoading(true);
+        const fetched = await client.agents.getAllAgents(50);
+        const processed: Agent[] = fetched.map((a) => ({
+          id: a.pubkey.toBase58(),
+          name: a.metadataUri,
+          description: '',
+          avatar: '🤖',
+          owner: a.pubkey.toBase58(),
+          category: AgentCategory.OTHER,
+          tags: [],
+          pricing: { type: 'free', currency: 'SOL' },
+          capabilities: [],
+          status: AgentStatus.ACTIVE,
+          reputation: a.reputation,
+          totalInteractions: 0,
+          createdAt: new Date(a.lastUpdated),
+          updatedAt: new Date(a.lastUpdated),
+          isVerified: false,
+        }));
+        setAgents(processed);
+      } catch (err) {
+        console.error('Failed to fetch agents', err);
+        setAgentsError('Failed to load agents');
+      } finally {
+        setAgentsLoading(false);
+      }
+    };
+
+    loadAgents();
+  }, [client, setAgents, setAgentsLoading, setAgentsError]);
 
   const filteredAgents = agents.filter((agent: Agent) => {
     const matchesSearch = agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

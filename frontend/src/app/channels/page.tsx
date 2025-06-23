@@ -15,96 +15,51 @@ import {
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useStore from '../../components/store/useStore';
 import { Channel, ChannelType } from '../../components/store/types';
+import usePodClient from '../../hooks/usePodClient';
 
 const ChannelsPage = () => {
-  const { channels, setChannels, setActiveChannel, user } = useStore();
+  const { channels, setChannels, setChannelsLoading, setChannelsError, setActiveChannel, user } = useStore();
+  const client = usePodClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<ChannelType | 'all'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Mock channels data
+  // Load channels from the protocol
   useEffect(() => {
-    const mockChannels: Channel[] = [
-      {
-        id: '1',
-        name: 'CodeMaster Pro Chat',
-        description: 'Direct conversation with CodeMaster Pro for React development',
-        type: ChannelType.AGENT_CHAT,
-        participants: [user?.id || 'user1'],
-        agents: ['1'],
-        owner: user?.id || 'user1',
-        isPrivate: true,
-        createdAt: new Date('2024-01-20T10:00:00'),
-        lastActivity: new Date('2024-01-20T15:30:00'),
-        messageCount: 45,
-        settings: {
-          allowFileUploads: true,
-          maxParticipants: 2,
-          moderationEnabled: false,
-          allowedFileTypes: ['.js', '.ts', '.jsx', '.tsx', '.json'],
-        },
-      },
-      {
-        id: '2',
-        name: 'Web3 Development Team',
-        description: 'Collaborative space for Web3 project development',
-        type: ChannelType.GROUP,
-        participants: [user?.id || 'user1', 'user2', 'user3'],
-        agents: ['1', '3'],
-        owner: user?.id || 'user1',
-        isPrivate: false,
-        createdAt: new Date('2024-01-18T09:00:00'),
-        lastActivity: new Date('2024-01-20T14:15:00'),
-        messageCount: 128,
-        settings: {
-          allowFileUploads: true,
-          maxParticipants: 10,
-          moderationEnabled: true,
-          allowedFileTypes: ['.js', '.ts', '.sol', '.md', '.json'],
-        },
-      },
-      {
-        id: '3',
-        name: 'Content Strategy',
-        description: 'Working with ContentCraft AI on marketing materials',
-        type: ChannelType.AGENT_CHAT,
-        participants: [user?.id || 'user1'],
-        agents: ['2'],
-        owner: user?.id || 'user1',
-        isPrivate: true,
-        createdAt: new Date('2024-01-19T14:00:00'),
-        lastActivity: new Date('2024-01-20T12:45:00'),
-        messageCount: 23,
-        settings: {
-          allowFileUploads: true,
-          maxParticipants: 2,
-          moderationEnabled: false,
-          allowedFileTypes: ['.md', '.txt', '.docx'],
-        },
-      },
-      {
-        id: '4',
-        name: 'Trading Analysis Hub',
-        description: 'Market analysis and trading strategies discussion',
-        type: ChannelType.GROUP,
-        participants: [user?.id || 'user1', 'user4', 'user5'],
-        agents: ['4'],
-        owner: 'user4',
-        isPrivate: false,
-        createdAt: new Date('2024-01-17T16:00:00'),
-        lastActivity: new Date('2024-01-20T11:20:00'),
-        messageCount: 89,
-        settings: {
-          allowFileUploads: true,
-          maxParticipants: 15,
-          moderationEnabled: true,
-          allowedFileTypes: ['.csv', '.xlsx', '.pdf'],
-        },
-      },
-    ];
-    
-    setChannels(mockChannels);
-  }, [setChannels, user?.id]);
+    const loadChannels = async () => {
+      try {
+        setChannelsLoading(true);
+        const fetched = await client.channels.getAllChannels(50);
+        const processed: Channel[] = fetched.map((c) => ({
+          id: c.pubkey.toBase58(),
+          name: c.name,
+          description: c.description,
+          type: ChannelType.GROUP,
+          participants: [],
+          agents: [],
+          owner: c.creator.toBase58(),
+          isPrivate: c.visibility !== 'public',
+          createdAt: new Date(c.createdAt),
+          lastActivity: new Date(c.createdAt),
+          messageCount: 0,
+          settings: {
+            allowFileUploads: true,
+            maxParticipants: c.maxParticipants,
+            moderationEnabled: false,
+            allowedFileTypes: [],
+          },
+        }));
+        setChannels(processed);
+      } catch (err) {
+        console.error('Failed to fetch channels', err);
+        setChannelsError('Failed to load channels');
+      } finally {
+        setChannelsLoading(false);
+      }
+    };
+
+    loadChannels();
+  }, [client, setChannels, setChannelsLoading, setChannelsError]);
 
   const filteredChannels = channels.filter(channel => {
     const matchesSearch = channel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

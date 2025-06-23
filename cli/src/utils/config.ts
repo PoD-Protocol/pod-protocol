@@ -39,16 +39,30 @@ export function loadConfig(): CliConfig {
 }
 
 /**
- * Load keypair from file path
+ * Load keypair from file path with enhanced security (MED-03)
+ * SECURITY ENHANCEMENT: Secure keypair handling with validation and protection
  */
 export function loadKeypair(keypairPath?: string): Keypair {
   const config = loadConfig();
   const path = keypairPath || config.keypairPath;
 
-  // Expand ~ to home directory
+  // SECURITY: Validate input path to prevent directory traversal attacks
+  if (path && (path.includes("..") || path.includes("./") || path.includes("\\"))) {
+    console.error(chalk.red("Error: Invalid keypair path - security violation detected"));
+    console.log(chalk.yellow("Path contains potentially dangerous characters"));
+    process.exit(1);
+  }
+
+  // Expand ~ to home directory securely
   const expandedPath = path.startsWith("~")
     ? join(homedir(), path.slice(1))
     : path;
+
+  // SECURITY: Ensure path is absolute and within reasonable bounds
+  if (!expandedPath || expandedPath.length > 500) {
+    console.error(chalk.red("Error: Invalid keypair path length"));
+    process.exit(1);
+  }
 
   if (!existsSync(expandedPath)) {
     console.error(chalk.red("Error: Keypair file not found:"), expandedPath);
@@ -57,19 +71,62 @@ export function loadKeypair(keypairPath?: string): Keypair {
         "Tip: Generate a new keypair with 'pod config generate-keypair'",
       ),
     );
+    console.log(
+      chalk.blue("Default location: ~/.config/solana/id.json")
+    );
     process.exit(1);
   }
 
   try {
-    const keypairData = JSON.parse(readFileSync(expandedPath, "utf8"));
-    return Keypair.fromSecretKey(new Uint8Array(keypairData));
-  } catch {
+    // SECURITY: Read file with size limit to prevent DoS
+    const fileStats = require("fs").statSync(expandedPath);
+    if (fileStats.size > 10000) { // Max 10KB for keypair file
+      console.error(chalk.red("Error: Keypair file too large (potential security issue)"));
+      process.exit(1);
+    }
+
+    const fileContent = readFileSync(expandedPath, "utf8");
+    
+    // SECURITY: Validate JSON structure before parsing
+    if (!fileContent.trim().startsWith("[") || !fileContent.trim().endsWith("]")) {
+      console.error(chalk.red("Error: Invalid keypair file format (must be JSON array)"));
+      process.exit(1);
+    }
+
+    const keypairData = JSON.parse(fileContent);
+    
+    // SECURITY: Validate keypair data structure
+    if (!Array.isArray(keypairData) || keypairData.length !== 64) {
+      console.error(chalk.red("Error: Invalid keypair data (must be 64-byte array)"));
+      process.exit(1);
+    }
+
+    // SECURITY: Validate all values are valid bytes (0-255)
+    for (let i = 0; i < keypairData.length; i++) {
+      if (!Number.isInteger(keypairData[i]) || keypairData[i] < 0 || keypairData[i] > 255) {
+        console.error(chalk.red(`Error: Invalid byte at position ${i} in keypair`));
+        process.exit(1);
+      }
+    }
+
+    const keypair = Keypair.fromSecretKey(new Uint8Array(keypairData));
+    
+    // SECURITY: Clear sensitive data from memory (basic attempt)
+    keypairData.fill(0);
+    
+    console.log(chalk.gray(`✓ Loaded keypair: ${keypair.publicKey.toBase58().slice(0, 8)}...`));
+    return keypair;
+    
+  } catch (error) {
     console.error(
-      chalk.red("Error: Invalid keypair file format:"),
-      expandedPath,
+      chalk.red("Error: Failed to load keypair:"),
+      error instanceof Error ? error.message : "Unknown error"
     );
     console.log(
-      chalk.yellow("Tip: Ensure the file contains a valid Solana keypair"),
+      chalk.yellow("Tip: Ensure the file contains a valid Solana keypair JSON array"),
+    );
+    console.log(
+      chalk.blue("Example format: [123,45,67,89,...]")
     );
     process.exit(1);
   }

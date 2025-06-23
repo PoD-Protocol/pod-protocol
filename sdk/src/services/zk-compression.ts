@@ -106,6 +106,19 @@ export interface BatchSyncOperation {
 }
 
 /**
+ * SECURITY WARNING (CRIT-01): ZK Compression Service - EXPERIMENTAL
+ * 
+ * This service integrates with Light Protocol for Zero-Knowledge compression.
+ * WARNING: This code is EXPERIMENTAL and has NOT undergone a formal security audit.
+ * 
+ * KNOWN SECURITY RISKS:
+ * - Proof forgery vulnerabilities in ZK verification
+ * - Data integrity issues with IPFS storage
+ * - Potential for state corruption between on-chain and off-chain data
+ * - Batch processing vulnerabilities
+ * 
+ * DO NOT USE IN PRODUCTION without proper security review.
+ * 
  * ZK Compression Service for PoD Protocol
  * Handles compressed account creation, batch operations, and Light Protocol integration
  */
@@ -207,6 +220,9 @@ export class ZKCompressionService extends BaseService {
 
   /**
    * Broadcast a compressed message to a channel
+   * 
+   * SECURITY WARNING: This function uses experimental ZK compression.
+   * Validate all inputs and verify all cryptographic operations.
    */
   async broadcastCompressedMessage(
     channelId: PublicKey,
@@ -221,6 +237,19 @@ export class ZKCompressionService extends BaseService {
     ipfsResult: IPFSStorageResult;
     compressedAccount: CompressedAccount;
   }> {
+    // SECURITY CHECKS (CRIT-01): Input validation for ZK compression
+    if (!channelId || !content || !wallet) {
+      throw new Error('Invalid input parameters for compressed message');
+    }
+    
+    if (content.length > 10000) { // Reasonable limit for content
+      throw new Error('Content too large for compression');
+    }
+    
+    if (messageType && !['Text', 'Data', 'Command', 'Response'].includes(messageType)) {
+      throw new Error('Invalid message type for compression');
+    }
+    
     try {
       // Store content on IPFS first
       const ipfsResult = await this.ipfsService.storeMessageContent(

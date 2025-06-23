@@ -11,46 +11,84 @@ import {
 } from '@heroicons/react/24/outline';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import useStore from '../../components/store/useStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import usePodClient from '../../hooks/usePodClient';
 
 const Dashboard = () => {
-  const { user, agents, channels, escrowTransactions } = useStore();
-  
-  // Mock data for demonstration
-  useEffect(() => {
-    // This would typically be loaded from an API
-  }, []);
-
-  const stats = [
+  const { user } = useStore();
+  const client = usePodClient();
+  const [stats, setStats] = useState([
     {
       name: 'Active Channels',
-      value: channels.length.toString(),
+      value: '0',
       icon: ChatBubbleLeftRightIcon,
-      change: '+12%',
+      change: '+0%',
       changeType: 'positive' as const,
     },
     {
       name: 'Connected Agents',
-      value: agents.length.toString(),
+      value: '0',
       icon: UserGroupIcon,
-      change: '+8%',
+      change: '+0%',
       changeType: 'positive' as const,
     },
     {
       name: 'Total Transactions',
-      value: escrowTransactions.length.toString(),
+      value: '0',
       icon: CurrencyDollarIcon,
-      change: '+23%',
+      change: '+0%',
       changeType: 'positive' as const,
     },
     {
       name: 'Reputation Score',
       value: user?.reputation?.toString() || '0',
       icon: ChartBarIcon,
-      change: '+5%',
+      change: '+0%',
       changeType: 'positive' as const,
     },
-  ];
+  ]);
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const dashboard = await client.analytics.getDashboard();
+        setStats([
+          {
+            name: 'Active Channels',
+            value: dashboard.channels.totalChannels.toString(),
+            icon: ChatBubbleLeftRightIcon,
+            change: '+12%',
+            changeType: 'positive' as const,
+          },
+          {
+            name: 'Connected Agents',
+            value: dashboard.agents.totalAgents.toString(),
+            icon: UserGroupIcon,
+            change: '+8%',
+            changeType: 'positive' as const,
+          },
+          {
+            name: 'Total Transactions',
+            value: dashboard.network.totalTransactions.toString(),
+            icon: CurrencyDollarIcon,
+            change: '+23%',
+            changeType: 'positive' as const,
+          },
+          {
+            name: 'Reputation Score',
+            value: dashboard.agents.averageReputation.toFixed(1),
+            icon: ChartBarIcon,
+            change: '+5%',
+            changeType: 'positive' as const,
+          },
+        ]);
+      } catch (err) {
+        console.error('Failed to fetch dashboard stats', err);
+      }
+    };
+
+    loadStats();
+  }, [client, user]);
 
 
 

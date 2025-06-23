@@ -82,6 +82,96 @@ jobs:
           cargo fmt -- --check
           cargo clippy -- -D warnings
 
+  security-audit:
+    name: "🔒 Security Audit (LOW-01)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cargo/registry
+            ~/.cargo/git
+            node_modules
+            sdk/node_modules
+            cli/node_modules
+            frontend/node_modules
+          key: ${{ runner.os }}-security-${{ hashFiles('**/bun.lock', '**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-security-
+
+      - name: Install dependencies
+        run: |
+          echo "📦 Installing all workspace dependencies..."
+          bun install --frozen-lockfile
+          echo "📦 Installing frontend dependencies..."
+          cd frontend && bun install --frozen-lockfile
+          echo "✅ All dependencies installed"
+
+      - name: Rust Security Audit
+        run: |
+          echo "🔒 Running Rust security audit..."
+          cd programs/pod-com
+          cargo audit --deny warnings
+          echo "✅ Rust security audit passed"
+
+      - name: Node.js Security Audit (Root)
+        run: |
+          echo "🔒 Running Node.js security audit for root workspace..."
+          bun audit --audit-level high
+          echo "✅ Root workspace security audit passed"
+
+      - name: Node.js Security Audit (SDK)
+        run: |
+          echo "🔒 Running Node.js security audit for SDK..."
+          cd sdk
+          bun audit --audit-level high
+          echo "✅ SDK security audit passed"
+
+      - name: Node.js Security Audit (CLI)
+        run: |
+          echo "🔒 Running Node.js security audit for CLI..."
+          cd cli
+          bun audit --audit-level high
+          echo "✅ CLI security audit passed"
+
+      - name: Node.js Security Audit (Frontend)
+        run: |
+          echo "🔒 Running Node.js security audit for Frontend..."
+          cd frontend
+          bun audit --audit-level high
+          echo "✅ Frontend security audit passed"
+
+      - name: Check for known vulnerabilities in dependencies
+        run: |
+          echo "🔍 Checking for vulnerable patterns in code..."
+          # Check for common security anti-patterns
+          if grep -r --include="*.ts" --include="*.js" --include="*.rs" -n "eval\|innerHTML\|dangerouslySetInnerHTML" . ; then
+            echo "⚠️ Warning: Found potentially dangerous patterns. Review for security implications."
+          fi
+          
+          # Check for hardcoded secrets (basic patterns)
+          if grep -r --include="*.ts" --include="*.js" --include="*.rs" -i "password\|secret\|key\|token" . | grep -v "test\|example\|placeholder" | grep "=" ; then
+            echo "⚠️ Warning: Found potential hardcoded credentials. Review for security implications."
+          fi
+          
+          echo "✅ Security pattern check completed"
+
   build:
     name: "🏗️ Build All"
     runs-on: ubuntu-latest
