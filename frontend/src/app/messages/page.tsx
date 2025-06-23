@@ -21,10 +21,8 @@ import {
   MessageStatus,
 } from "@/components/store/types";
 import usePodClient from "@/hooks/usePodClient";
-import {
-  PublicKey,
-  MessageStatus as SDKMessageStatus,
-} from "@pod-protocol/sdk";
+import { MessageStatus as SDKMessageStatus } from "@pod-protocol/sdk";
+import { PublicKey } from "@solana/web3.js";
 
 function mapStatus(status: SDKMessageStatus): MessageStatus {
   switch (status) {
