@@ -305,9 +305,9 @@ export default function MessagesPage() {
                   <div className="flex-1 relative">
                   <textarea
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      aria-label="Message text"
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    aria-label="Message text"
                       placeholder="Type a message..."
                       rows={1}
                       className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
