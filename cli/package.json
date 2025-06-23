@@ -64,6 +64,7 @@
     "@coral-xyz/anchor-cli": "0.31.1",
     "@pod-protocol/sdk": "^1.2.0",
     "@solana/web3.js": "^1.95.4",
+    "@lightprotocol/photon-client": "^0.1.0",
     "chalk": "^5.3.0",
     "commander": "^14.0.0",
     "inquirer": "^12.0.0",

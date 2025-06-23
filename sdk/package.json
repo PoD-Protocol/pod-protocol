@@ -69,6 +69,7 @@
     "@lightprotocol/stateless.js": "^0.22.0",
     "@solana/web3.js": "^1.95.4",
     "@solana/wallet-adapter-base": "^0.9.27",
+    "@lightprotocol/photon-client": "^0.1.0",
     "ipfs-http-client": "^60.0.1",
     "multiformats": "^13.1.0"
   },

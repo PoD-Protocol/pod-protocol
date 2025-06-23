@@ -10,6 +10,7 @@ import { displayError } from '../utils/error-handler.js';
 import { outputFormatter } from '../utils/output-formatter.js';
 import { validatePublicKey } from '../utils/validation.js';
 import { findAgentPDA } from '@pod-protocol/sdk';
+import { PhotonIndexerClient } from '@lightprotocol/photon-client';
 
 export function createZKCompressionCommand(): Command {
   const zk = new Command('zk')
@@ -443,18 +444,14 @@ export function createZKCompressionCommand(): Command {
       try {
         if (options.test) {
           console.log('🔍 Testing indexer connection...');
-          
-          const response = await fetch(`${options.url}/health`);
-          if (response.ok) {
-            const health = await response.json();
-            outputFormatter.success('Indexer connection successful', {
-              url: options.url,
-              status: health,
-              version: health.version || 'unknown'
-            });
-          } else {
-            throw new Error(`Indexer returned ${response.status}: ${response.statusText}`);
-          }
+
+          const client = new PhotonIndexerClient({ endpoint: options.url });
+          const health = await client.getHealth();
+          outputFormatter.success('Indexer connection successful', {
+            url: options.url,
+            status: health,
+            version: health.version || 'unknown'
+          });
         } else {
           outputFormatter.info('Indexer configuration', {
             current_url: options.url,

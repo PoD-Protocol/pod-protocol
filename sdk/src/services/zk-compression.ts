@@ -5,6 +5,7 @@ import { Transaction, TransactionInstruction, PublicKey, Connection } from '@sol
 
 import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
 import { createMint, mintTo, transfer, CompressedTokenProgram } from '@lightprotocol/compressed-token';
+import { PhotonIndexerClient, PhotonIndexerClientOptions } from '@lightprotocol/photon-client';
 
 /**
  * Compressed account information returned by Light Protocol
@@ -44,6 +45,8 @@ export interface ZKCompressionConfig {
   proverUrl?: string;
   /** Photon indexer endpoint */
   photonIndexerUrl?: string;
+  /** Photon indexer client options */
+  photonIndexerClientOptions?: PhotonIndexerClientOptions;
   /** Maximum batch size for compression operations */
   maxBatchSize?: number;
   /** Batch size (alias for maxBatchSize) */
@@ -112,6 +115,7 @@ export interface BatchSyncOperation {
 export class ZKCompressionService extends BaseService {
   private config: ZKCompressionConfig;
   private rpc: Rpc;
+  private indexer: PhotonIndexerClient;
   private ipfsService: IPFSService;
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
@@ -146,6 +150,8 @@ export class ZKCompressionService extends BaseService {
         zkConfig.photonIndexerUrl ||
         process.env.PHOTON_INDEXER_URL ||
         "http://localhost:8080",
+      photonIndexerClientOptions:
+        zkConfig.photonIndexerClientOptions,
       maxBatchSize: zkConfig.maxBatchSize || 50,
       enableBatching: zkConfig.enableBatching ?? true,
       batchTimeout: zkConfig.batchTimeout || 5000,
@@ -196,6 +202,12 @@ export class ZKCompressionService extends BaseService {
       this.config.lightRpcUrl,
       this.config.compressionRpcUrl, // Use compression endpoint
       this.config.proverUrl  // Use prover endpoint
+    );
+
+    this.indexer = new PhotonIndexerClient(
+      this.config.photonIndexerClientOptions ?? {
+        endpoint: this.config.photonIndexerUrl,
+      },
     );
 
     this.ipfsService = ipfsService;
@@ -466,34 +478,17 @@ export class ZKCompressionService extends BaseService {
     } = {}
   ): Promise<CompressedChannelMessage[]> {
     try {
-      // Query compressed messages via Photon indexer JSON-RPC
-      const rpcReq = {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: 'getCompressedMessagesByChannel',
-        params: [
-          channelId.toString(),
-          options.limit ?? 50,
-          options.offset ?? 0,
-          options.sender?.toString() || null,
-          options.after?.getTime() || null,
-          options.before?.getTime() || null,
-        ],
-      };
-      const response = await fetch(this.config.photonIndexerUrl!, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rpcReq),
-      });
-      if (!response.ok) {
-        throw new Error(`Indexer RPC failed: ${response.statusText}`);
-      }
-      const json = await response.json() as { result?: any[], error?: { message?: string } };
-      if (json.error) {
-        throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
-      }
-      const raw = json.result || [];
-      return raw.map(m => ({
+      const raw = await this.indexer.getCompressedMessagesByChannel(
+        channelId.toString(),
+        {
+          limit: options.limit ?? 50,
+          offset: options.offset ?? 0,
+          sender: options.sender?.toString(),
+          after: options.after?.getTime(),
+          before: options.before?.getTime(),
+        },
+      );
+      return raw.map((m: any) => ({
         channel: new PublicKey(m.channel),
         sender: new PublicKey(m.sender),
         contentHash: m.content_hash,
@@ -518,20 +513,12 @@ export class ZKCompressionService extends BaseService {
     compressionRatio: number;
   }> {
     try {
-      const response = await fetch(
-        `${this.config.photonIndexerUrl}/channel-stats/${channelId.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Stats query failed: ${response.statusText}`);
-      }
-
-      const data = await response.json() as any;
+      const data = await this.indexer.getChannelStats(channelId.toString());
       return {
         totalMessages: data.totalMessages || 0,
         totalParticipants: data.totalParticipants || 0,
         storageSize: data.storageSize || 0,
-        compressionRatio: data.compressionRatio || 1.0
+        compressionRatio: data.compressionRatio || 1.0,
       };
     } catch (error) {
       throw new Error(`Failed to get channel stats: ${error}`);
