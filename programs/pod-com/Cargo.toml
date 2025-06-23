@@ -27,7 +27,8 @@ solana-program = { version = "=1.18.22", default-features = false }
 # Light Protocol ZK Compression dependencies - using older compatible versions
 light-compressed-token = { version = "1.1.0", features = ["cpi", "idl-build"] }
 light-system-program = { version = "1.1.0", features = ["cpi", "idl-build"] }
-light-hasher = { version = "1.1.0" }
+light-hasher = { version = "3.1.0" }
+account-compression = { version = "1.2.0", features = ["cpi"] }
 light-utils = { version = "1.1.0" }
 light-heap = { version = "1.1.0" }
 
