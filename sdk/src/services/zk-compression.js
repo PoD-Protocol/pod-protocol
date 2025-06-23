@@ -33,12 +33,12 @@ export class ZKCompressionService extends BaseService {
                 process.env.COMPRESSION_RPC_URL ||
                 zkConfig.lightRpcUrl ||
                 process.env.LIGHT_RPC_URL ||
-                "https://devnet.helius-rpc.com/?api-key=<your-api-key>",
+                "https://devnet.helius-rpc.com",
             proverUrl: zkConfig.proverUrl ||
                 process.env.PROVER_URL ||
                 zkConfig.lightRpcUrl ||
                 process.env.LIGHT_RPC_URL ||
-                "https://devnet.helius-rpc.com/?api-key=<your-api-key>",
+                "https://devnet.helius-rpc.com",
             photonIndexerUrl: zkConfig.photonIndexerUrl ||
                 process.env.PHOTON_INDEXER_URL ||
                 "http://localhost:8080",
