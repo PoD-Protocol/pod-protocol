@@ -4,6 +4,7 @@ import { IPFSService, IPFSStorageResult } from './ipfs.js';
 import { Transaction, TransactionInstruction, PublicKey, Connection } from '@solana/web3.js';
 
 import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
+import { PhotonClient } from '@lightprotocol/photon-indexer-client';
 import { createMint, mintTo, transfer, CompressedTokenProgram } from '@lightprotocol/compressed-token';
 
 /**
@@ -128,6 +129,7 @@ export class ZKCompressionService extends BaseService {
   private config: ZKCompressionConfig;
   private rpc: Rpc;
   private ipfsService: IPFSService;
+  private photon: PhotonClient;
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
   private lastBatchResult?: { signature: string; compressedAccounts: any[] };
@@ -214,6 +216,7 @@ export class ZKCompressionService extends BaseService {
     );
 
     this.ipfsService = ipfsService;
+    this.photon = new PhotonClient({ endpoint: this.config.photonIndexerUrl! });
 
     if (this.config.enableBatching) {
       this.startBatchTimer();
@@ -497,34 +500,18 @@ export class ZKCompressionService extends BaseService {
     } = {}
   ): Promise<CompressedChannelMessage[]> {
     try {
-      // Query compressed messages via Photon indexer JSON-RPC
-      const rpcReq = {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: 'getCompressedMessagesByChannel',
-        params: [
-          channelId.toString(),
-          options.limit ?? 50,
-          options.offset ?? 0,
-          options.sender?.toString() || null,
-          options.after?.getTime() || null,
-          options.before?.getTime() || null,
-        ],
-      };
-      const response = await fetch(this.config.photonIndexerUrl!, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rpcReq),
-      });
-      if (!response.ok) {
-        throw new Error(`Indexer RPC failed: ${response.statusText}`);
-      }
-      const json = await response.json() as { result?: any[], error?: { message?: string } };
-      if (json.error) {
-        throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
-      }
-      const raw = json.result || [];
-      return raw.map(m => ({
+      const raw = await this.photon.getCompressedMessagesByChannel(
+        channelId.toString(),
+        {
+          limit: options.limit ?? 50,
+          offset: options.offset ?? 0,
+          sender: options.sender?.toString(),
+          after: options.after?.getTime(),
+          before: options.before?.getTime(),
+        },
+      );
+
+      return raw.map((m: any) => ({
         channel: new PublicKey(m.channel),
         sender: new PublicKey(m.sender),
         contentHash: m.content_hash,
