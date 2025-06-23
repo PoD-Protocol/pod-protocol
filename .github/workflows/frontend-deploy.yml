@@ -244,6 +244,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: frontend-build
     if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    permissions:
+      contents: read
     environment:
       name: staging
       url: ${{ steps.deploy.outputs.staging-url }}
