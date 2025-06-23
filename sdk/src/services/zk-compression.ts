@@ -498,7 +498,7 @@ export class ZKCompressionService extends BaseService {
         wallet.publicKey
       );
       const transaction = new Transaction().add(instruction);
-      const signature = await this.rpc.sendTransaction(transaction, []);
+      const signature = await this.rpc.sendTransaction(transaction, [wallet]);
 
       return {
         signature,
