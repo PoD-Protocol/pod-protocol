@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { Keypair } from "@solana/web3.js";
 import chalk from "chalk";
+import { SecureKeypairLoader, secureWipe } from "./secure-memory.js";
 
 interface CliConfig {
   network: string;
@@ -35,6 +36,54 @@ export function loadConfig(): CliConfig {
       network: "devnet",
       keypairPath: join(homedir(), ".config", "solana", "id.json"),
     };
+  }
+}
+
+/**
+ * Load keypair using secure memory operations
+ * SECURITY ENHANCEMENT: Uses secure memory to protect private keys
+ */
+export async function loadKeypairSecure(keypairPath?: string): Promise<Keypair> {
+  const config = loadConfig();
+  const path = keypairPath || config.keypairPath;
+
+  // SECURITY: Validate input path
+  if (path && (path.includes("..") || path.includes("./") || path.includes("\\"))) {
+    console.error(chalk.red("Error: Invalid keypair path - security violation detected"));
+    process.exit(1);
+  }
+
+  const expandedPath = path.startsWith("~")
+    ? join(homedir(), path.slice(1))
+    : path;
+
+  if (!expandedPath || !existsSync(expandedPath)) {
+    console.error(chalk.red(`Error: Keypair file not found at ${expandedPath}`));
+    process.exit(1);
+  }
+
+  try {
+    // Load keypair using secure memory
+    const { publicKey, secretKey } = await SecureKeypairLoader.loadKeypair(expandedPath);
+    
+    // Create full keypair buffer in secure memory
+    const fullKeypair = Buffer.alloc(64);
+    secretKey.getBuffer().copy(fullKeypair, 0);
+    publicKey.copy(fullKeypair, 32);
+    
+    // Create Solana Keypair object
+    const keypair = Keypair.fromSecretKey(fullKeypair);
+    
+    // Securely wipe the temporary buffer
+    secureWipe(fullKeypair);
+    
+    // Clean up secure memory
+    secretKey.destroy();
+    
+    return keypair;
+  } catch (error) {
+    console.error(chalk.red("Error loading keypair:"), error);
+    process.exit(1);
   }
 }
 
@@ -79,7 +128,7 @@ export function loadKeypair(keypairPath?: string): Keypair {
 
   try {
     // SECURITY: Read file with size limit to prevent DoS
-    const fileStats = require("fs").statSync(expandedPath);
+    const fileStats = statSync(expandedPath);
     if (fileStats.size > 10000) { // Max 10KB for keypair file
       console.error(chalk.red("Error: Keypair file too large (potential security issue)"));
       process.exit(1);

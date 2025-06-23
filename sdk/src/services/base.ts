@@ -1,7 +1,8 @@
 import { Connection, PublicKey, Commitment } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 const { Program } = anchor;
-type AnchorProgram = Program<any>;
+import type { Program as ProgramType } from "@coral-xyz/anchor";
+type AnchorProgram = ProgramType<any>;
 
 /**
  * Configuration object for BaseService constructor

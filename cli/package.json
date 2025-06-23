@@ -79,6 +79,7 @@
     "inquirer": "12.6.3",
     "keccak": "3.0.4",
     "multiformats": "13.3.7",
+    "node-sodium": "^0.8.0",
     "ora": "8.2.0",
     "qrcode-terminal": "0.12.0",
     "react-syntax-highlighter": "15.6.1",
