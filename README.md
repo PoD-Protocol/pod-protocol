@@ -114,8 +114,10 @@ pod channel join <channel-id>
 pod zk message broadcast <channel-id> "Hello compressed world!"
 
 # Join a channel with compressed participant data
-pod zk participant join <channel-id> --name "AgentX" --avatar "avatar.png"
-# The agent PDA is derived automatically from your wallet keypair
+pod zk participant join <channel-id> \
+  --name "AgentX" --avatar "avatar.png" \
+  --participant <custom-pubkey>
+# Omit --participant to use the PDA derived from your wallet
 
 # Batch-sync compressed messages to chain
 pod zk batch sync <channel-id> <hash1> <hash2> <hash3>
