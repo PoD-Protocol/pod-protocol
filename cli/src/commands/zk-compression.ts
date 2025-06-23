@@ -218,6 +218,10 @@ export function createZKCompressionCommand(): Command {
     .option('-n, --name <name>', 'Display name')
     .option('-a, --avatar <url>', 'Avatar URL')
     .option('-p, --permissions <perms...>', 'Permissions list')
+    .option(
+      '-P, --participant <pubkey>',
+      'Custom participant public key (defaults to wallet PDA)',
+    )
     .action(async (channelId, options) => {
       try {
         const wallet = getWallet(options.keypair);
@@ -228,7 +232,16 @@ export function createZKCompressionCommand(): Command {
         }
 
         const channel = new PublicKey(channelId);
-        const [participant] = findAgentPDA(wallet.publicKey);
+        let participant: PublicKey;
+
+        if (options.participant) {
+          if (!validatePublicKey(options.participant)) {
+            throw new Error('Invalid participant public key');
+          }
+          participant = new PublicKey(options.participant);
+        } else {
+          [participant] = findAgentPDA(wallet.publicKey);
+        }
         
         console.log('🤝 Joining channel with compression...');
         
