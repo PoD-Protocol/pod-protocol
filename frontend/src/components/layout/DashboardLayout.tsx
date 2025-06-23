@@ -15,6 +15,7 @@ import {
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import useStore from '../store/useStore';
 import MatrixRain from '../ui/MatrixRain';
+import Link from 'next/link';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -70,7 +71,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-2">
             {navigation.map((item) => (
-              <a
+              <Link
                 key={item.name}
                 href={item.href}
                 className={`
@@ -93,7 +94,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                     </motion.span>
                   )}
                 </AnimatePresence>
-              </a>
+              </Link>
             ))}
           </nav>
           
@@ -158,6 +159,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <input
                   type="text"
                   placeholder="Search agents, channels..."
+                  aria-label="Search agents and channels"
                   className="
                     pl-10 pr-4 py-2 w-64
                     bg-gray-800/50 border border-purple-500/20
@@ -171,7 +173,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             
             <div className="flex items-center space-x-4">
               {/* Notifications */}
-              <button className="relative p-2 text-gray-400 hover:text-white hover:bg-purple-600/20 rounded-lg transition-colors">
+              <button
+                aria-label="Notifications"
+                className="relative p-2 text-gray-400 hover:text-white hover:bg-purple-600/20 rounded-lg transition-colors"
+              >
                 <BellIcon className="h-5 w-5" />
                 {unreadNotifications > 0 && (
                   <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
