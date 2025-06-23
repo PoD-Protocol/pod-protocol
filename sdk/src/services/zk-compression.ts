@@ -588,7 +588,7 @@ export class ZKCompressionService extends BaseService {
     const infos = await this.rpc.getStateTreeInfos();
     const treeInfo = infos[0];
     return await LightSystemProgram.compress({
-      payer: this.wallet,
+      payer: authority,
       toAddress: merkleTree,
       lamports: 0,
       outputStateTreeInfo: treeInfo,
