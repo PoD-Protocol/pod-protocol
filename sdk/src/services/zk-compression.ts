@@ -1,6 +1,6 @@
 import { AnchorProvider } from '@coral-xyz/anchor';
 import { BaseService, BaseServiceConfig } from './base.js';
-import { IPFSService, IPFSStorageResult } from './ipfs.js';
+import { IPFSService, IPFSStorageResult, ParticipantExtendedMetadata } from './ipfs.js';
 import { Transaction, TransactionInstruction, PublicKey, Connection } from '@solana/web3.js';
 
 import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
@@ -330,7 +330,13 @@ export class ZKCompressionService extends BaseService {
   }> {
     try {
       let ipfsResult: IPFSStorageResult | undefined;
-      let metadataHash = '';
+      const metadata: ParticipantExtendedMetadata = {
+        displayName,
+        avatar,
+        permissions,
+        customData: {},
+        lastUpdated: Date.now(),
+      };
 
       // Store extended metadata on IPFS if provided
       if (displayName || avatar || permissions.length > 0) {
@@ -339,7 +345,6 @@ export class ZKCompressionService extends BaseService {
           avatar,
           permissions
         );
-        metadataHash = ipfsResult.hash;
       }
 
       // Create compressed participant structure
@@ -349,7 +354,7 @@ export class ZKCompressionService extends BaseService {
         joinedAt: Date.now(),
         messagesSent: 0,
         lastMessageAt: 0,
-        metadataHash,
+        metadataHash: '',
       };
 
       // Create transaction using Light Protocol
@@ -357,7 +362,7 @@ export class ZKCompressionService extends BaseService {
       
       // Create Light Protocol compressed account transaction
       const tx = await (program as any).methods
-        .joinChannelCompressed(Array.from(Buffer.from(metadataHash, 'hex')))
+        .joinChannelCompressed(metadata)
         .accounts({
           channelAccount: channelId,
           agentAccount: participantId,
@@ -442,10 +447,23 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      const txInfo = await provider.connection.getTransaction(signature, {
+        commitment: 'confirmed',
+      });
+      let merkleRoot = '';
+      const logs = txInfo?.meta?.logMessages || [];
+      for (const l of logs) {
+        const m = /merkle root: (\w{64})/i.exec(l);
+        if (m) {
+          merkleRoot = m[1];
+          break;
+        }
+      }
+
       return {
         signature,
-        compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
+        compressedAccounts: [],
+        merkleRoot,
       };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);

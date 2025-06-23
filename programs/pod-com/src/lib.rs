@@ -6,6 +6,8 @@ use anchor_lang::solana_program::pubkey::Pubkey;
 
 // Light Protocol ZK Compression imports
 use light_compressed_token::program::LightCompressedToken;
+use light_compressed_token::cpi::accounts::{CompressAccount, CompressAccounts};
+use light_compressed_token::cpi::{compress_account, compress_accounts};
 use light_system_program::program::LightSystemProgram;
 use light_hasher::{hash_to_bn254_field_size_be, LightHasher};
 
@@ -194,6 +196,14 @@ pub struct EscrowWithdrawal {
     pub channel: Pubkey,
     pub depositor: Pubkey,
     pub amount: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct BatchSyncCompleted {
+    pub channel: Pubkey,
+    pub merkle_root: [u8; 32],
+    pub count: u32,
     pub timestamp: i64,
 }
 
@@ -1022,9 +1032,10 @@ pub mod pod_com {
     }
 
     /// Join a channel with compressed participant data
+    /// The metadata hash is generated on-chain from the provided metadata
     pub fn join_channel_compressed(
         ctx: Context<JoinChannelCompressed>,
-        metadata_hash: [u8; 32],
+        metadata: ParticipantExtendedMetadata,
     ) -> Result<()> {
         let channel = &mut ctx.accounts.channel_account;
         let agent = &ctx.accounts.agent_account;
@@ -1054,8 +1065,9 @@ pub mod pod_com {
             }
         }
 
-        // Use provided metadata_hash for participant compression
-        let metadata_hash = metadata_hash;
+        // Dynamically generate the metadata hash to avoid trusting the client
+        let metadata_bytes = borsh::to_vec(&metadata)?;
+        let (metadata_hash, _) = hash_to_bn254_field_size_be(&metadata_bytes)?;
 
         let compressed_participant = CompressedChannelParticipant {
             channel: channel.key(),
@@ -1123,39 +1135,37 @@ pub mod pod_com {
             return Err(PodComError::Unauthorized.into());
         }
 
-        // Create batch sync proof using Light Protocol's batch compression
-        for (i, hash) in message_hashes.iter().enumerate() {
-            // Each hash represents a compressed message that was stored off-chain
-            // Verify the hash and create compressed account
-            let cpi_accounts = CompressAccount {
-                fee_payer: ctx.accounts.fee_payer.to_account_info(),
-                authority: ctx.accounts.authority.to_account_info(),
-                light_system_program: ctx.accounts.light_system_program.to_account_info(),
-                registered_program_id: ctx.accounts.registered_program_id.to_account_info(),
-                noop_program: ctx.accounts.noop_program.to_account_info(),
-                account_compression_authority: ctx
-                    .accounts
-                    .account_compression_authority
-                    .to_account_info(),
-                account_compression_program: ctx
-                    .accounts
-                    .account_compression_program
-                    .to_account_info(),
-                merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-                nullifier_queue: ctx.accounts.nullifier_queue.to_account_info(),
-                cpi_authority_pda: ctx.accounts.cpi_authority_pda.to_account_info(),
-            };
-            let cpi_ctx = CpiContext::new(
-                ctx.accounts.light_system_program.to_account_info(),
-                cpi_accounts,
-            );
-            compress_account(cpi_ctx, hash.to_vec(), None)?;
-        }
+        // Batch compress all hashes using Light Protocol
+        let cpi_accounts = CompressAccounts {
+            fee_payer: ctx.accounts.fee_payer.to_account_info(),
+            authority: ctx.accounts.authority.to_account_info(),
+            light_system_program: ctx.accounts.light_system_program.to_account_info(),
+            registered_program_id: ctx.accounts.registered_program_id.to_account_info(),
+            noop_program: ctx.accounts.noop_program.to_account_info(),
+            account_compression_authority: ctx.accounts.account_compression_authority.to_account_info(),
+            account_compression_program: ctx.accounts.account_compression_program.to_account_info(),
+            merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
+            nullifier_queue: ctx.accounts.nullifier_queue.to_account_info(),
+            cpi_authority_pda: ctx.accounts.cpi_authority_pda.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.compressed_token_program.to_account_info(),
+            cpi_accounts,
+        );
+        let merkle_root = compress_accounts(cpi_ctx, message_hashes.clone())?;
+
+        emit!(BatchSyncCompleted {
+            channel: channel.key(),
+            merkle_root,
+            count: message_hashes.len() as u32,
+            timestamp: sync_timestamp,
+        });
 
         msg!(
-            "Batch synced {} compressed messages at timestamp: {}",
+            "Batch synced {} compressed messages at timestamp: {} merkle root: {:x?}",
             message_hashes.len(),
-            sync_timestamp
+            sync_timestamp,
+            merkle_root
         );
         Ok(())
     }
@@ -1493,7 +1503,7 @@ pub struct BroadcastMessageCompressed<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(metadata_hash: [u8; 32])]
+#[instruction(metadata: ParticipantExtendedMetadata)]
 pub struct JoinChannelCompressed<'info> {
     #[account(mut)]
     pub channel_account: Account<'info, ChannelAccount>,
