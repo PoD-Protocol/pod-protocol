@@ -41,7 +41,8 @@ function checkPackageManager(manager) {
 
 function checkCommand(cmd) {
   try {
-    execSync(`which ${cmd}`, { stdio: 'pipe' });
+    const command = process.platform === 'win32' ? 'where' : 'which';
+    execSync(`${command} ${cmd}`, { stdio: 'pipe' });
     return true;
   } catch {
     return false;
