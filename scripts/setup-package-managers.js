@@ -65,6 +65,12 @@ async function main() {
   if (!checkCommand('anchor')) {
     console.log('📦 Installing Anchor CLI...');
     runCommand('npm install -g @coral-xyz/anchor-cli@0.31.1');
+  } else {
+    const anchorVersion = execSync('anchor --version', { stdio: 'pipe' }).toString().trim();
+    if (!anchorVersion.includes('0.31.1')) {
+      console.log('📦 Updating Anchor CLI to required version...');
+      runCommand('npm install -g @coral-xyz/anchor-cli@0.31.1');
+    }
   }
 
   if (!checkCommand('rollup')) {
