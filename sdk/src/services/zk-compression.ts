@@ -60,6 +60,8 @@ export interface ZKCompressionConfig {
   cpiAuthorityPda?: PublicKey;
   /** Compressed Token program */
   compressedTokenProgram?: PublicKey;
+  /** Compressed Token mint */
+  compressedTokenMint?: PublicKey;
   /** Registered Program ID */
   registeredProgramId?: PublicKey;
   /** No-op Program */
@@ -190,6 +192,11 @@ export class ZKCompressionService extends BaseService {
         (process.env.LIGHT_ACCOUNT_COMPRESSION_PROGRAM
           ? new PublicKey(process.env.LIGHT_ACCOUNT_COMPRESSION_PROGRAM)
           : new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK")),
+      compressedTokenMint:
+        zkConfig.compressedTokenMint ||
+        (process.env.LIGHT_COMPRESSED_TOKEN_MINT
+          ? new PublicKey(process.env.LIGHT_COMPRESSED_TOKEN_MINT)
+          : new PublicKey("jLW99oqPBQx7A3DjwzC6BTgy6o3DQ6mrWprNUbQbTkP")),
     };
 
     this.rpc = createRpc(

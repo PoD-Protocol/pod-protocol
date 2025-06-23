@@ -18,7 +18,11 @@ describe("ZKCompressionService", () => {
   } as any;
   const ipfs = new IPFSService(baseConfig, {});
 
-  const service = new ZKCompressionService(baseConfig, {}, ipfs);
+  const service = new ZKCompressionService(
+    baseConfig,
+    { compressedTokenMint: Keypair.generate().publicKey },
+    ipfs,
+  );
   (service as any).rpc = new MockRpc();
   // Use jest.spyOn or similar approach to mock without modifying the original
   const compressSpy = jest.spyOn(CompressedTokenProgram, 'compress')

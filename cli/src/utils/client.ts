@@ -38,6 +38,9 @@ export async function createClient(
       accountCompressionProgram: process.env.LIGHT_ACCOUNT_COMPRESSION_PROGRAM
         ? new PublicKey(process.env.LIGHT_ACCOUNT_COMPRESSION_PROGRAM)
         : undefined,
+      compressedTokenMint: process.env.LIGHT_COMPRESSED_TOKEN_MINT
+        ? new PublicKey(process.env.LIGHT_COMPRESSED_TOKEN_MINT)
+        : undefined,
     },
   });
   await client.initialize(wallet);
