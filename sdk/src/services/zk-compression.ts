@@ -516,40 +516,30 @@ export class ZKCompressionService extends BaseService {
     wallet: any
   ): Promise<any> {
     try {
-      const program = this.ensureInitialized();
-      
-      // Implement Light Protocol integration
-      const tx = await (program as any).methods
-        .broadcastMessageCompressed(
-          message.contentHash, // Use content hash instead of full content
-          message.messageType,
-          message.replyTo || null,
-          message.ipfsHash
-        )
-        .accounts({
-          channelAccount: message.channel,
-          participantAccount: message.sender,
-          feePayer: wallet.publicKey,
-          authority: wallet.publicKey,
-          lightSystemProgram: new PublicKey('H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN'),
-          compressedTokenProgram: new PublicKey('cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m'),
-          registeredProgramId: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          noopProgram: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          accountCompressionAuthority: new PublicKey('5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW'),
-          accountCompressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-          merkleTree: message.channel,
-          nullifierQueue: this.config.nullifierQueuePubkey,
-        cpiAuthorityPda: this.config.cpiAuthorityPda,
-        })
-        .transaction();
+      const { buildAndSignTx, sendAndConfirmTx, getParsedEvents } = await import(
+        '@lightprotocol/stateless.js/dist/cjs/node/utils/send-and-confirm.js'
+      );
 
-      const provider = program.provider as AnchorProvider;
-      const signature = await provider.sendAndConfirm(tx);
+      const instruction = await this.createCompressionInstruction(
+        message.channel,
+        message,
+        wallet.publicKey
+      );
+
+      const blockhash = await this.rpc.connection.getLatestBlockhash();
+      const tx = buildAndSignTx([instruction], wallet, blockhash.blockhash);
+      const signature = await sendAndConfirmTx(this.rpc, tx);
+
+      const events = await getParsedEvents(this.rpc);
+      const event = events.find(e => e.signature === signature);
+
+      const hash = event?.outputCompressedAccountHashes?.[0]?.toString() || '';
+      const proof = event?.outputCompressedAccounts?.[0]?.merkleContext || null;
 
       return {
         signature,
         ipfsResult,
-        compressedAccount: { hash: '', data: message },
+        compressedAccount: { hash, data: message, merkleContext: proof },
       };
     } catch (error) {
       throw new Error(`Failed to process compressed message: ${error}`);
@@ -567,41 +557,39 @@ export class ZKCompressionService extends BaseService {
     const batch = [...this.batchQueue];
     this.batchQueue = [];
 
-    // Process batch using Light Protocol's batch compression
-    // This would involve creating a batch transaction with multiple compressed accounts
-    
-    // Execute batch compression via Light Protocol transactions
-    const compressedAccounts = [];
-    let lastSignature = '';
-    
+    const { buildAndSignTx, sendAndConfirmTx, getParsedEvents } = await import(
+      '@lightprotocol/stateless.js/dist/cjs/node/utils/send-and-confirm.js'
+    );
+
+    const instructions: TransactionInstruction[] = [];
     for (const msg of batch) {
-      const instruction = await this.createCompressionInstruction(msg.channel, msg, wallet.publicKey);
-      const transaction = new Transaction().add(instruction);
-      const signature = await this.rpc.sendTransaction(transaction, []);
-      
-      compressedAccounts.push({
-        hash: msg.contentHash,
-        data: msg,
-      });
-      
-      lastSignature = signature;
+      instructions.push(
+        await this.createCompressionInstruction(msg.channel, msg, wallet.publicKey)
+      );
     }
-    
-    const rpcResult = {
-      signature: lastSignature,
-      compressedAccounts,
-      merkleRoot: '',
-    };
+
+    const blockhash = await this.rpc.connection.getLatestBlockhash();
+    const tx = buildAndSignTx(instructions, wallet, blockhash.blockhash);
+    const signature = await sendAndConfirmTx(this.rpc, tx);
+
+    const events = await getParsedEvents(this.rpc);
+    const event = events.find(e => e.signature === signature);
+
+    const compressedAccounts = (event?.outputCompressedAccountHashes || []).map((h, i) => ({
+      hash: h.toString(),
+      data: batch[i],
+      merkleContext: event?.outputCompressedAccounts?.[i]?.merkleContext,
+    }));
+
     const result = {
-      signature: rpcResult.signature,
-      compressedAccounts: rpcResult.compressedAccounts,
-      merkleRoot: rpcResult.merkleRoot,
+      signature,
+      compressedAccounts,
+      merkleRoot: event?.sequenceNumbers?.[0]?.pubkey?.toString() || '',
     };
     
-    // Store the result for pending batch promises
     this.lastBatchResult = {
       signature: result.signature,
-      compressedAccounts: result.compressedAccounts
+      compressedAccounts: result.compressedAccounts,
     };
     
     return result;
@@ -631,13 +619,18 @@ export class ZKCompressionService extends BaseService {
     message: CompressedChannelMessage,
     authority: PublicKey
   ): Promise<TransactionInstruction> {
-    // Create a simple transaction instruction for compression
-    // This is a placeholder implementation that should be replaced with actual Light Protocol integration
-    const { SystemProgram } = await import('@solana/web3.js');
-    return SystemProgram.transfer({
-      fromPubkey: authority,
-      toPubkey: merkleTree,
+    const { LightSystemProgram, getTreeInfoByPubkey } = await import(
+      '@lightprotocol/stateless.js'
+    );
+
+    const infos = await this.rpc.getStateTreeInfos();
+    const info = getTreeInfoByPubkey(infos, merkleTree);
+
+    return LightSystemProgram.compress({
+      payer: authority,
+      toAddress: authority,
       lamports: 0,
+      outputStateTreeInfo: info,
     });
   }
 
