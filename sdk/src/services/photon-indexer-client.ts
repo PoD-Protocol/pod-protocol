@@ -22,7 +22,8 @@ export class PhotonIndexerClient {
 
   async getCompressedMessagesByChannel(
     channelId: string,
-    options: QueryOptions = {}
+    options: QueryOptions = {},
+    timeoutMs: number = 10000
   ): Promise<PhotonCompressedMessage[]> {
     const rpcReq = {
       jsonrpc: '2.0',
@@ -38,27 +39,35 @@ export class PhotonIndexerClient {
       ],
     };
 
-    const response = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rpcReq),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!response.ok) {
-      throw new Error(`Indexer RPC failed: ${response.statusText}`);
+    try {
+      const response = await fetch(this.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rpcReq),
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`Indexer RPC failed: ${response.statusText}`);
+      }
+
+      const json = (await response.json()) as {
+        result?: PhotonCompressedMessage[];
+        error?: { message?: string };
+      };
+
+      if (json.error) {
+        throw new Error(
+          `Indexer RPC error: ${json.error.message || 'Unknown error'}`
+        );
+      }
+
+      return json.result ?? [];
+    } finally {
+      clearTimeout(timeoutId);
     }
-
-    const json = (await response.json()) as {
-      result?: PhotonCompressedMessage[];
-      error?: { message?: string };
-    };
-
-    if (json.error) {
-      throw new Error(
-        `Indexer RPC error: ${json.error.message || 'Unknown error'}`
-      );
-    }
-
-    return json.result ?? [];
   }
 }
