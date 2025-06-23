@@ -116,4 +116,9 @@
   .font-mono {
     font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
   }
+
+  /* Simple spinner */
+  .spinner {
+    @apply w-8 h-8 border-4 border-pod-violet border-t-transparent rounded-full animate-spin;
+  }
 }

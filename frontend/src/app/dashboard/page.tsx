@@ -51,7 +51,7 @@ const Dashboard = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const dashboard = await client.getDashboard();
+        const dashboard = await client.analytics.getDashboard();
         setStats([
           {
             name: 'Active Channels',

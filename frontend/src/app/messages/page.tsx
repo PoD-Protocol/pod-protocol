@@ -22,10 +22,8 @@ import {
   MessageStatus,
 } from "@/components/store/types";
 import usePodClient from "@/hooks/usePodClient";
-import {
-  PublicKey,
-  MessageStatus as SDKMessageStatus,
-} from "@pod-protocol/sdk";
+import { MessageStatus as SDKMessageStatus } from "@pod-protocol/sdk";
+import { PublicKey } from "@solana/web3.js";
 
 function mapStatus(status: SDKMessageStatus): MessageStatus {
   switch (status) {
@@ -218,11 +216,12 @@ export default function MessagesPage() {
           {/* Conversations List */}
           <div className="flex-1 overflow-y-auto">
             {filteredConversations.map((conv) => (
-              <motion.div
+              <motion.button
                 key={conv.agent.id}
+                type="button"
                 whileHover={{ backgroundColor: "rgba(139, 92, 246, 0.1)" }}
                 onClick={() => setSelectedAgent(conv.agent)}
-                className={`p-4 cursor-pointer border-b border-purple-500/10 transition-colors ${
+                className={`w-full text-left p-4 border-b border-purple-500/10 transition-colors ${
                   selectedAgent?.id === conv.agent.id ? "bg-purple-500/20" : ""
                 }`}
               >
@@ -252,7 +251,7 @@ export default function MessagesPage() {
                     </p>
                   </div>
                 </div>
-              </motion.div>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -328,10 +327,11 @@ export default function MessagesPage() {
                     <Paperclip className="w-5 h-5" />
                   </button>
                   <div className="flex-1 relative">
-                    <textarea
+                  <textarea
                       value={newMessage}
-                      onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    aria-label="Message text"
                       placeholder="Type a message..."
                       rows={1}
                       className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
