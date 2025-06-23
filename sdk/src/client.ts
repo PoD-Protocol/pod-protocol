@@ -1,6 +1,7 @@
 import { Connection, PublicKey, Signer, Commitment } from "@solana/web3.js";
 import anchor from "@coral-xyz/anchor";
 const { Program, AnchorProvider } = anchor;
+import type { Program as ProgramType } from "@coral-xyz/anchor";
 import {
   PROGRAM_ID,
   PodComConfig,
@@ -26,6 +27,7 @@ import { BaseService, BaseServiceConfig } from "./services/base";
 import { AgentService } from "./services/agent";
 import { MessageService } from "./services/message";
 import { ChannelService } from "./services/channel";
+import { SecureKeyManager, SecureWalletOperations } from "./utils/secure-memory";
 import { EscrowService } from "./services/escrow";
 import { AnalyticsService } from "./services/analytics";
 import { DiscoveryService } from "./services/discovery";
@@ -40,7 +42,7 @@ export class PodComClient {
   private connection: Connection;
   private programId: PublicKey;
   private commitment: Commitment;
-  private program?: Program<any>; // Use any for IDL compatibility
+  private program?: ProgramType<any>; // Use any for IDL compatibility
 
   // Service instances - public for direct access to specific functionality
   public agents: AgentService;
@@ -411,5 +413,34 @@ export class PodComClient {
       this.analytics.hasIDL() &&
       this.discovery.hasIDL()
     );
+  }
+
+  /**
+   * Securely handle private key operations
+   * SECURITY ENHANCEMENT: Uses secure memory for private key operations
+   */
+  withSecurePrivateKey<T>(
+    privateKey: Uint8Array,
+    callback: (secureKey: any) => T
+  ): T {
+    return SecureWalletOperations.withSecurePrivateKey(privateKey, callback);
+  }
+
+  /**
+   * Clean up all secure memory buffers
+   * SECURITY ENHANCEMENT: Call this when shutting down the client
+   */
+  secureCleanup(): void {
+    SecureKeyManager.cleanup();
+  }
+
+  /**
+   * Generate secure random bytes for cryptographic operations
+   * SECURITY ENHANCEMENT: Uses cryptographically secure random number generation
+   */
+  generateSecureRandom(size: number): Uint8Array {
+    const buffer = new Uint8Array(size);
+    crypto.getRandomValues(buffer);
+    return buffer;
   }
 }

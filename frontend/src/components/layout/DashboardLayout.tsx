@@ -158,6 +158,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
+                  aria-label="Search agents and channels"
                   placeholder="Search agents, channels..."
                   className="
                     pl-10 pr-4 py-2 w-64

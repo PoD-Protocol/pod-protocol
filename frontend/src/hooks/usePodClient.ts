@@ -11,7 +11,8 @@ export default function usePodClient() {
 
   useEffect(() => {
     let mounted = true;
-    client.initialize(wallet).catch((err) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    client.initialize(wallet as any).catch((err) => {
       if (mounted) {
         console.error('Failed to initialize PoD client', err);
       }

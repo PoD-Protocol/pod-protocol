@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PlusIcon,
@@ -18,6 +19,7 @@ import { Channel, ChannelType } from '../../components/store/types';
 import usePodClient from '../../hooks/usePodClient';
 
 const ChannelsPage = () => {
+  const router = useRouter();
   const { channels, setChannels, setChannelsLoading, setChannelsError, setActiveChannel } = useStore();
   const client = usePodClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,7 +118,7 @@ const ChannelsPage = () => {
   const handleChannelClick = (channelId: string) => {
     setActiveChannel(channelId);
     // Navigate to chat interface
-    window.location.href = `/chat/${channelId}`;
+    router.push(`/chat/${channelId}`);
   };
 
   return (
@@ -145,6 +147,7 @@ const ChannelsPage = () => {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
+                aria-label="Search channels"
                 placeholder="Search channels..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}

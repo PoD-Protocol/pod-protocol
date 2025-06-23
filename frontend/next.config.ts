@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     // Handle Node.js modules for client-side
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      '@coral-xyz/anchor$': require('path').resolve(__dirname, 'anchor-default.js'),
+    };
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
