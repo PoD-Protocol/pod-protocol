@@ -4,6 +4,7 @@ import { IPFSService, IPFSStorageResult } from './ipfs.js';
 import { Transaction, TransactionInstruction, PublicKey, Connection } from '@solana/web3.js';
 
 import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
+import BN from 'bn.js';
 import { createMint, mintTo, transfer, CompressedTokenProgram } from '@lightprotocol/compressed-token';
 
 /**
@@ -473,10 +474,29 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      let compressedAccounts: CompressedAccount[] = [];
+      let merkleRoot = '';
+
+      try {
+        const bnHashes = messageHashes.map((h) => new BN(h, 'hex'));
+        const [accounts, proofs] = await Promise.all([
+          this.rpc.getMultipleCompressedAccounts(bnHashes),
+          this.rpc.getMultipleCompressedAccountProofs(bnHashes),
+        ]);
+        compressedAccounts = accounts.map((acct, i) => ({
+          hash: messageHashes[i],
+          data: acct,
+          merkleContext: proofs[i],
+        }));
+        merkleRoot = proofs[0]?.root?.toString(16) ?? '';
+      } catch (_) {
+        // ignore parsing errors and return empty results
+      }
+
       return {
         signature,
-        compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
+        compressedAccounts,
+        merkleRoot,
       };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);
