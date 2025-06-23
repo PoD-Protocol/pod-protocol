@@ -47,7 +47,10 @@ export class PhotonClient {
     if (json.error) {
       throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
     }
-    return json.result ?? [];
+    if (json.result === undefined) {
+      throw new Error('Invalid JSON-RPC response: missing result field');
+    }
+    return json.result;
   }
 
   async getChannelStats(channel: string): Promise<any> {
