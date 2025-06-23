@@ -8,7 +8,7 @@ import { homedir } from "os";
 import { join, dirname } from "path";
 import { Keypair } from "@solana/web3.js";
 import qrcode from "qrcode-terminal";
-import { loadConfig as loadSharedConfig } from "../utils/config.js";
+import { loadConfig as loadSharedConfig, getProgramId } from "../utils/config.js";
 
 interface CliConfig {
   network: string;
@@ -274,7 +274,7 @@ export class ConfigCommands {
           const data = [
             ["Network", currentConfig.network],
             ["Keypair Path", currentConfig.keypairPath],
-            ["Program ID", currentConfig.programId || "Default"],
+            ["Program ID", getProgramId()],
             ["Custom Endpoint", currentConfig.customEndpoint || "None"],
           ];
 

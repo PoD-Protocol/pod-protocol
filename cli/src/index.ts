@@ -26,6 +26,7 @@ import {
   DECORATIVE_ELEMENTS,
 } from "./utils/branding.js";
 import { errorHandler } from "./utils/enhanced-error-handler.js";
+import { getProgramId } from "./utils/config.js";
 
 // Get current version from package.json
 const __filename = fileURLToPath(import.meta.url);
@@ -125,7 +126,7 @@ program
         },
         {
           label: "Program ID",
-          value: "HEpGLgYsE1kP8aoYKyLFc3JVVrofS7T4zEA6fWBJsZps",
+          value: getProgramId(),
           icon: ICONS.chain,
         },
         { label: "Status", value: "OPERATIONAL", icon: ICONS.success },
