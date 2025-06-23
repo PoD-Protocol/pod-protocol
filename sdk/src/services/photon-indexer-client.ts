@@ -1,12 +1,12 @@
 export interface PhotonCompressedMessage {
   channel: string;
   sender: string;
-  content_hash: string;
-  ipfs_hash: string;
-  message_type: string;
-  created_at: number;
-  edited_at?: number;
-  reply_to?: string;
+  contentHash: string;
+  ipfsHash: string;
+  messageType: string;
+  createdAt: number;
+  editedAt?: number;
+  replyTo?: string;
 }
 
 export interface QueryOptions {
