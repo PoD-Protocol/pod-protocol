@@ -10,6 +10,7 @@ import {
   ArrowTrendingUpIcon,
 } from '@heroicons/react/24/outline';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { RequireWallet } from '../../components/wallet/RequireWallet';
 import useStore from '../../components/store/useStore';
 import { useEffect } from 'react';
 
@@ -56,7 +57,8 @@ const Dashboard = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <RequireWallet>
+        <div className="space-y-8">
         {/* Welcome Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -293,6 +295,7 @@ const Dashboard = () => {
           </div>
         </motion.div>
       </div>
+      </RequireWallet>
     </DashboardLayout>
   );
 };

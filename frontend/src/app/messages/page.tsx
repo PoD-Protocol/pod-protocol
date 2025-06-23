@@ -4,11 +4,17 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Search, MoreVertical, Phone, Video, Info, Paperclip, Smile } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { RequireWallet } from '@/components/wallet/RequireWallet';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { usePodClient } from '@/components/providers/PodClientProvider';
+import { PublicKey } from '@solana/web3.js';
 import useStore from '@/components/store/useStore';
 import { Message, Agent, MessageType, MessageStatus } from '@/components/store/types';
 
 export default function MessagesPage() {
   const { messages, agents, user, addMessage } = useStore();
+  const wallet = useWallet();
+  const client = usePodClient();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,6 +90,30 @@ export default function MessagesPage() {
     };
 
     addMessage(channelId, message);
+
+    if (
+      client &&
+      wallet.connected &&
+      wallet.publicKey &&
+      wallet.signTransaction
+    ) {
+      try {
+        const anchorWallet = {
+          publicKey: wallet.publicKey,
+          signTransaction: wallet.signTransaction,
+          signAllTransactions: wallet.signAllTransactions!,
+        };
+        const recipient = new PublicKey(selectedAgent.id);
+        client.messages.sendMessage(anchorWallet, {
+          recipient,
+          payload: newMessage,
+          messageType: MessageType.TEXT,
+        });
+      } catch (err) {
+        console.error('sendMessage error', err);
+      }
+    }
+
     setNewMessage('');
   };
 
@@ -96,6 +126,7 @@ export default function MessagesPage() {
 
   return (
     <DashboardLayout>
+      <RequireWallet>
       <div className="flex h-[calc(100vh-4rem)] bg-black/20 backdrop-blur-sm rounded-xl border border-purple-500/20">
         {/* Conversations Sidebar */}
         <div className="w-80 border-r border-purple-500/20 flex flex-col">
@@ -258,6 +289,7 @@ export default function MessagesPage() {
           )}
         </div>
       </div>
+      </RequireWallet>
     </DashboardLayout>
   );
 }

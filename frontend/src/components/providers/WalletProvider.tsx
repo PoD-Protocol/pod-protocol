@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, ReactNode, useMemo } from 'react';
+import React, { FC, ReactNode, useMemo, useEffect } from 'react';
 import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
@@ -18,6 +18,8 @@ import {
   WalletMultiButton,
 } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
+import useStore from '../store/useStore';
 
 // Default styles that can be overridden by your app
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -59,6 +61,25 @@ export const WalletProvider: FC<WalletProviderProps> = ({ children }) => {
     ],
     [network]
   );
+
+  const wallet = useWallet();
+  const setUser = useStore(state => state.setUser);
+
+  useEffect(() => {
+    if (wallet.connected && wallet.publicKey) {
+      const pubkey = wallet.publicKey.toBase58();
+      setUser({
+        id: pubkey,
+        walletAddress: pubkey,
+        username: pubkey.slice(0, 6),
+        reputation: 0,
+        createdAt: new Date(),
+        lastActive: new Date(),
+      });
+    } else {
+      setUser(null);
+    }
+  }, [wallet.connected, wallet.publicKey, setUser]);
 
   return (
     <ConnectionProvider endpoint={endpoint}>

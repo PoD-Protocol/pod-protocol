@@ -12,6 +12,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { RequireWallet } from '../../components/wallet/RequireWallet';
 import useStore from '../../components/store/useStore';
 import { Agent, AgentCategory, AgentStatus } from '../../components/store/types';
 
@@ -160,6 +161,7 @@ const AgentsPage = () => {
 
   return (
     <DashboardLayout>
+      <RequireWallet>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -334,6 +336,7 @@ const AgentsPage = () => {
           </motion.div>
         )}
       </div>
+      </RequireWallet>
     </DashboardLayout>
   );
 };

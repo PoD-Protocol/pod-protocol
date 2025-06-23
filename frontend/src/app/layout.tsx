@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import { WalletProvider } from "../components/providers/WalletProvider";
+import { PodClientProvider } from "../components/providers/PodClientProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -98,7 +99,9 @@ export default function RootLayout({
           {/* Main content */}
           <div className="relative z-10">
             <WalletProvider>
-              {children}
+              <PodClientProvider>
+                {children}
+              </PodClientProvider>
             </WalletProvider>
           </div>
         </div>

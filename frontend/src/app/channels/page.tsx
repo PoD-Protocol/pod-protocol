@@ -13,14 +13,24 @@ import {
   ClockIcon,
 } from '@heroicons/react/24/outline';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import { RequireWallet } from '../../components/wallet/RequireWallet';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { usePodClient } from '../../components/providers/PodClientProvider';
 import useStore from '../../components/store/useStore';
 import { Channel, ChannelType } from '../../components/store/types';
+import { ChannelVisibility } from '@pod-protocol/sdk';
 
 const ChannelsPage = () => {
   const { channels, setChannels, setActiveChannel, user } = useStore();
+  const wallet = useWallet();
+  const client = usePodClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<ChannelType | 'all'>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newType, setNewType] = useState<ChannelType>(ChannelType.GROUP);
+  const [newPrivate, setNewPrivate] = useState(false);
 
   // Mock channels data
   useEffect(() => {
@@ -164,8 +174,32 @@ const ChannelsPage = () => {
     window.location.href = `/chat/${channelId}`;
   };
 
+  const handleCreateChannel = async () => {
+    if (!client || !wallet.connected || !wallet.publicKey || !wallet.signTransaction) {
+      return;
+    }
+    try {
+      const anchorWallet = {
+        publicKey: wallet.publicKey,
+        signTransaction: wallet.signTransaction,
+        signAllTransactions: wallet.signAllTransactions!,
+      };
+      await client.channels.createChannel(anchorWallet, {
+        name: newName,
+        description: newDesc,
+        visibility: newPrivate ? ChannelVisibility.Private : ChannelVisibility.Public,
+        maxParticipants: 100,
+        feePerMessage: 0,
+      });
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error('Create channel error', err);
+    }
+  };
+
   return (
     <DashboardLayout>
+      <RequireWallet>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
@@ -361,6 +395,8 @@ const ChannelsPage = () => {
                   <input
                     type="text"
                     placeholder="Enter channel name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   />
                 </div>
@@ -371,6 +407,8 @@ const ChannelsPage = () => {
                   <textarea
                     placeholder="Describe the purpose of this channel"
                     rows={3}
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
                     className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
                   />
                 </div>
@@ -378,7 +416,11 @@ const ChannelsPage = () => {
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Channel Type
                   </label>
-                  <select className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50">
+                  <select
+                    className="w-full px-3 py-2 bg-gray-800/50 border border-purple-500/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value as ChannelType)}
+                  >
                     <option value={ChannelType.GROUP}>Group Chat</option>
                     <option value={ChannelType.AGENT_CHAT}>Agent Chat</option>
                     <option value={ChannelType.DIRECT}>Direct Message</option>
@@ -388,6 +430,8 @@ const ChannelsPage = () => {
                   <input
                     type="checkbox"
                     id="private"
+                    checked={newPrivate}
+                    onChange={(e) => setNewPrivate(e.target.checked)}
                     className="rounded border-purple-500/20 bg-gray-800/50 text-purple-600 focus:ring-purple-500/50"
                   />
                   <label htmlFor="private" className="text-sm text-gray-300">
@@ -402,7 +446,10 @@ const ChannelsPage = () => {
                 >
                   Cancel
                 </button>
-                <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors">
+                <button
+                  onClick={handleCreateChannel}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                >
                   Create Channel
                 </button>
               </div>
@@ -410,6 +457,7 @@ const ChannelsPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      </RequireWallet>
     </DashboardLayout>
   );
 };
