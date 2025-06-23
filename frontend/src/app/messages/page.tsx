@@ -6,6 +6,8 @@ import { Send, Search, MoreVertical, Phone, Video, Info, Paperclip, Smile } from
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import useStore from '@/components/store/useStore';
 import { Message, Agent, MessageType, MessageStatus } from '@/components/store/types';
+import usePodClient from '../../hooks/usePodClient';
+import { PublicKey } from '@solana/web3.js';
 
 export default function MessagesPage() {
   const { messages, agents, user, addMessage } = useStore();
@@ -14,28 +16,66 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Mock conversations data
-  const conversations = agents.slice(0, 5).map(agent => {
-    // Find last message for this agent across all channels
-    let lastMessage = null;
-    for (const channelMessages of Object.values(messages)) {
-      const agentMessages = channelMessages.filter(m => 
-        m.senderId === agent.id || (m.senderType === 'user' && user && m.senderId === user.id)
-      );
-      if (agentMessages.length > 0) {
-        const latest = agentMessages[agentMessages.length - 1];
-        if (!lastMessage || latest.timestamp > lastMessage.timestamp) {
-          lastMessage = latest;
-        }
+  const client = usePodClient();
+  const [conversations, setConversations] = useState<{
+    agent: Agent;
+    lastMessage: Message | null;
+    unreadCount: number;
+  }[]>([]);
+
+  useEffect(() => {
+    const loadConversations = async () => {
+      if (!user) {
+        setConversations([]);
+        return;
       }
-    }
-    
-    return {
-      agent,
-      lastMessage,
-      unreadCount: Math.floor(Math.random() * 5)
+
+      try {
+        const items = await Promise.all(
+          agents.slice(0, 5).map(async (agent) => {
+            try {
+              const search = await client.discovery.searchMessages({
+                sender: new PublicKey(agent.id),
+                recipient: new PublicKey(user.id),
+                sortBy: 'recent',
+                sortOrder: 'desc',
+                limit: 1,
+              });
+
+              const msg = search.items[0];
+
+              const lastMessage: Message | null = msg
+                ? {
+                    id: msg.pubkey.toBase58(),
+                    channelId: msg.pubkey.toBase58(),
+                    senderId: msg.sender.toBase58(),
+                    senderType: msg.sender.toBase58() === user.id ? 'user' : 'agent',
+                    content: msg.payload,
+                    type: MessageType.TEXT,
+                    timestamp: new Date(msg.timestamp),
+                    attachments: [],
+                    reactions: [],
+                    status: MessageStatus.SENT,
+                  }
+                : null;
+
+              return { agent, lastMessage, unreadCount: 0 };
+            } catch (err) {
+              console.error('Failed to fetch conversation for agent', agent.id, err);
+              return { agent, lastMessage: null, unreadCount: 0 };
+            }
+          })
+        );
+
+        setConversations(items);
+      } catch (err) {
+        console.error('Failed to load conversations', err);
+        setConversations([]);
+      }
     };
-  });
+
+    loadConversations();
+  }, [agents, user, client]);
 
   const filteredConversations = conversations.filter(conv =>
     conv.agent.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -150,6 +190,9 @@ export default function MessagesPage() {
                 </div>
               </motion.div>
             ))}
+            {filteredConversations.length === 0 && (
+              <div className="p-4 text-center text-purple-300">No conversations available</div>
+            )}
           </div>
         </div>
 
