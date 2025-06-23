@@ -51,6 +51,7 @@ const Dashboard = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
+        // Verify client API structure before using
         const dashboard = await client.analytics.getDashboard();
         setStats([
           {
