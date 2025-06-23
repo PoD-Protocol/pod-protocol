@@ -38,8 +38,10 @@ const AgentsPage = () => {
           sdkAgents.map(async (a) => {
             let metadata: any = {};
             try {
-              const res = await fetch(a.metadataUri);
-              if (res.ok) metadata = await res.json();
+              if (a.metadataUri) {
+                const res = await fetch(a.metadataUri);
+                if (res.ok) metadata = await res.json();
+              }
             } catch {
               // ignore metadata fetch errors
             }
