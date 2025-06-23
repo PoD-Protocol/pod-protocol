@@ -28,7 +28,6 @@ const navigation = [
 ];
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { sidebarCollapsed, setSidebarCollapsed, user, notifications } = useStore();
   
   const unreadNotifications = notifications.filter(n => !n.read).length;
@@ -192,18 +191,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </main>
       </div>
       
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Mobile Menu Overlay - removed unused state */}
     </div>
   );
 };

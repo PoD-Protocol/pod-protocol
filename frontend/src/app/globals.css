@@ -108,6 +108,10 @@
     @apply bg-gradient-to-r from-pod-surface via-pod-surface-light to-pod-surface bg-[length:200%_100%] animate-pulse;
   }
 
+  .spinner {
+    @apply w-8 h-8 border-4 border-pod-violet border-t-transparent rounded-full animate-spin;
+  }
+
   /* Typography */
   .text-gradient {
     @apply bg-gradient-to-r from-pod-violet to-pod-blue bg-clip-text text-transparent;

@@ -235,7 +235,8 @@ const ChannelsPage = () => {
                       <span className="px-2 py-1 bg-purple-600/20 text-purple-300 text-xs rounded-full">
                         {getChannelTypeLabel(channel.type)}
                       </span>
-                      <button 
+                      <button
+                        aria-label="Channel options"
                         onClick={(e) => {
                           e.stopPropagation();
                           // Handle menu click

@@ -159,6 +159,7 @@ const AgentsPage = () => {
             
             {/* Filter Toggle */}
             <button
+              aria-label="Toggle filters"
               onClick={() => setShowFilters(!showFilters)}
               className="px-4 py-3 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/20 rounded-lg text-purple-400 transition-colors duration-200 flex items-center space-x-2"
             >
@@ -172,6 +173,25 @@ const AgentsPage = () => {
         <div className="text-gray-400">
           Found {filteredAgents.length} agent{filteredAgents.length !== 1 ? 's' : ''}
         </div>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 my-4">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category as AgentCategory)}
+                className={`px-3 py-2 rounded-lg text-sm transition-colors border ${
+                  selectedCategory === category
+                    ? 'bg-purple-600 text-white border-purple-500'
+                    : 'bg-gray-800 text-gray-300 border-purple-500/20'
+                }`}
+              >
+                {category.charAt(0).toUpperCase() + category.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Agents Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -243,10 +263,10 @@ const AgentsPage = () => {
                     {formatPrice(agent)}
                   </div>
                   <div className="flex space-x-2">
-                    <button className="p-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg transition-colors">
+                    <button aria-label="Open chat" className="p-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded-lg transition-colors">
                       <ChatBubbleLeftRightIcon className="h-4 w-4" />
                     </button>
-                    <button className="p-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors">
+                    <button aria-label="Tip agent" className="p-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-lg transition-colors">
                       <CurrencyDollarIcon className="h-4 w-4" />
                     </button>
                   </div>

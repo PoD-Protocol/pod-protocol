@@ -163,7 +163,7 @@ export default function MessagesPage() {
     setNewMessage("");
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -251,16 +251,16 @@ export default function MessagesPage() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
+                  <button aria-label="Start call" className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
                     <Phone className="w-5 h-5" />
                   </button>
-                  <button className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
+                  <button aria-label="Start video call" className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
                     <Video className="w-5 h-5" />
                   </button>
-                  <button className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
+                  <button aria-label="Agent info" className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
                     <Info className="w-5 h-5" />
                   </button>
-                  <button className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
+                  <button aria-label="More options" className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
                     <MoreVertical className="w-5 h-5" />
                   </button>
                 </div>
@@ -298,23 +298,24 @@ export default function MessagesPage() {
               {/* Message Input */}
               <div className="p-4 border-t border-purple-500/20">
                 <div className="flex items-end space-x-2">
-                  <button className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
+                  <button aria-label="Attach file" className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
                     <Paperclip className="w-5 h-5" />
                   </button>
                   <div className="flex-1 relative">
                     <textarea
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                      onKeyDown={handleKeyDown}
                       placeholder="Type a message..."
                       rows={1}
                       className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                     />
                   </div>
-                  <button className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
+                  <button aria-label="Add emoji" className="p-2 text-purple-400 hover:text-white hover:bg-purple-500/20 rounded-lg transition-colors">
                     <Smile className="w-5 h-5" />
                   </button>
                   <motion.button
+                    aria-label="Send message"
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSendMessage}
