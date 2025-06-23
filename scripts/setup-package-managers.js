@@ -2,7 +2,8 @@
 
 /**
  * Setup script to handle Bun and Anchor compatibility
- * This script ensures both Bun and Yarn work together for the PoD Protocol
+ * This script ensures Bun, Yarn, Anchor CLI and Rollup are available
+ * for the PoD Protocol development environment
  */
 
 import { execSync } from 'child_process';
@@ -38,6 +39,15 @@ function checkPackageManager(manager) {
   }
 }
 
+function checkCommand(cmd) {
+  try {
+    execSync(`${cmd} --version`, { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   console.log('🔧 Setting up package managers for PoD Protocol...');
   
@@ -51,6 +61,16 @@ async function main() {
     console.log('📦 Installing Yarn...');
     runCommand('npm install -g yarn');
   }
+
+  if (!checkCommand('anchor')) {
+    console.log('📦 Installing Anchor CLI...');
+    runCommand('npm install -g @coral-xyz/anchor-cli@0.31.1');
+  }
+
+  if (!checkCommand('rollup')) {
+    console.log('📦 Installing Rollup...');
+    runCommand('npm install -g rollup');
+  }
   
   console.log('📦 Installing dependencies with Yarn (for Anchor compatibility)...');
   runCommand('yarn install', { exitOnError: false });
@@ -62,7 +82,7 @@ async function main() {
     runCommand('cd cli && bun install', { exitOnError: false });
   }
   
-  console.log('✅ Package manager setup complete!');
+  console.log('✅ Package manager and tool setup complete!');
   console.log('📋 Usage:');
   console.log('  - Use "yarn" for Anchor commands (build, deploy, test)');
   console.log('  - Use "bun" for workspace development (faster builds)');

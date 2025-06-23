@@ -43,7 +43,7 @@
     "ci:build": "yarn run build:verify && yarn run build:all",
     "ci:test": "yarn run test:all && yarn run lint:all",
     "validate:workflows": "node scripts/validate-workflows.js",
-    "pretest": "yarn run build:verify",
+    "pretest": "node scripts/build.js anchor",
     "prepublishOnly": "yarn run production:test && yarn run build:all"
   },
   "keywords": [

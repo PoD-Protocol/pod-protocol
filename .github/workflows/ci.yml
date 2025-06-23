@@ -14,6 +14,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Setup package managers and tools
+        run: npm run setup
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -93,6 +96,9 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Setup package managers and tools
+        run: npm run setup
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -178,6 +184,9 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Setup package managers and tools
+        run: npm run setup
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

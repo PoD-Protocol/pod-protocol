@@ -23,8 +23,10 @@ This will:
 
 1. Install Yarn (if not present)
 2. Install Bun (if not present)
-3. Create yarn.lock for Anchor compatibility
-4. Install dependencies in workspaces with Bun
+3. Install the Anchor CLI
+4. Install Rollup globally
+5. Create `yarn.lock` for Anchor compatibility
+6. Install dependencies in workspaces with Bun
 
 ## Usage Guidelines
 
