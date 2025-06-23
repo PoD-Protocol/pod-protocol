@@ -1,6 +1,11 @@
 import { PodComClient } from "@pod-protocol/sdk";
 import { getNetworkEndpoint, loadKeypair } from "./config.js";
 import { Keypair, PublicKey } from "@solana/web3.js";
+import nacl from "tweetnacl-async";
+
+function zeroize(buf: Uint8Array): void {
+  buf.fill(0);
+}
 
 export async function createClient(
   network?: string,
@@ -45,20 +50,26 @@ export async function createClient(
 }
 
 export function getWallet(keypairPath?: string): any {
-  const keypair = loadKeypair(keypairPath);
+  const tmpKeypair = loadKeypair(keypairPath);
+  const publicKey = tmpKeypair.publicKey;
+  zeroize(tmpKeypair.secretKey);
 
   // Return wallet-like interface that Anchor expects
   return {
-    publicKey: keypair.publicKey,
+    publicKey,
     signTransaction: async (tx: any) => {
-      tx.partialSign(keypair);
+      const signer = loadKeypair(keypairPath);
+      tx.partialSign(signer);
+      zeroize(signer.secretKey);
       return tx;
     },
     signAllTransactions: async (txs: any[]) => {
-      return txs.map((tx) => {
-        tx.partialSign(keypair);
-        return tx;
+      const signer = loadKeypair(keypairPath);
+      txs.forEach((tx) => {
+        tx.partialSign(signer);
       });
+      zeroize(signer.secretKey);
+      return txs;
     },
   };
 }

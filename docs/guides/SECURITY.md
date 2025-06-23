@@ -548,12 +548,16 @@ export class SecureKeyManager {
     if (!encryptedKey) {
       throw new Error('Key not found');
     }
-    
+
     const key = await this.deriveKey(password, encryptedKey.salt);
     return this.decrypt(encryptedKey.encrypted, key);
   }
 }
 ```
+
+The CLI utilities wipe secret key buffers after signing transactions. Using the
+`tweetnacl-async` library, the secret key memory is zeroized immediately after
+each signing operation to reduce the risk of key leakage.
 
 ### Monitoring & Alerting
 
