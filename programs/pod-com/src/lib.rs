@@ -5,9 +5,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::pubkey::Pubkey;
 
 // Light Protocol ZK Compression imports
-use light_compressed_token::program::LightCompressedToken;
-use light_system_program::program::LightSystemProgram;
-use light_hasher::LightHasher;
+use light_sdk::instructions::verify_zk_compression;
 
 declare_id!("HEpGLgYsE1kP8aoYKyLFc3JVVrofS7T4zEA6fWBJsZps");
 
@@ -291,50 +289,6 @@ pub struct MessageAccount {
     _reserved: [u8; 7],            // 7 bytes (padding)
 }
 
-// =============================================================================
-// ZK COMPRESSED ACCOUNT STRUCTURES
-// =============================================================================
-
-// Compressed Channel Message - stores only essential data on-chain, content via IPFS
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, LightHasher)]
-pub struct CompressedChannelMessage {
-    pub channel: Pubkey,           // 32 bytes
-    pub sender: Pubkey,            // 32 bytes
-    #[hash]
-    pub content_hash: [u8; 32],    // 32 bytes - SHA256 hash of IPFS content
-    pub ipfs_hash: String,         // 4 + 64 bytes - IPFS content identifier
-    pub message_type: MessageType, // 1 byte
-    pub created_at: i64,           // 8 bytes
-    pub edited_at: Option<i64>,    // 9 bytes
-    pub reply_to: Option<Pubkey>,  // 33 bytes
-}
-
-// Compressed Channel Participant - minimal on-chain footprint
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, LightHasher)]
-pub struct CompressedChannelParticipant {
-    pub channel: Pubkey,         // 32 bytes
-    pub participant: Pubkey,     // 32 bytes
-    pub joined_at: i64,          // 8 bytes
-    pub messages_sent: u64,      // 8 bytes
-    pub last_message_at: i64,    // 8 bytes
-    #[hash]
-    pub metadata_hash: [u8; 32], // 32 bytes - Hash of extended metadata in IPFS
-}
-
-// IPFS Content structures for off-chain storage
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ChannelMessageContent {
-    pub content: String,                 // Full message content
-    pub attachments: Vec<String>,        // Optional file attachments
-    pub metadata: Vec<(String, String)>, // Key-value metadata pairs
-}
-
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub struct ParticipantExtendedMetadata {
-    pub display_name: Option<String>,
-    pub permissions: Vec<String>,
-    pub custom_data: Vec<(String, String)>,
-}
 
 #[allow(deprecated, unexpected_cfgs)]
 #[program]
@@ -918,247 +872,16 @@ pub mod pod_com {
         Ok(())
     }
 
-    // =============================================================================
-    // ZK COMPRESSION FUNCTIONS
-    // =============================================================================
-
-    /// Broadcast a compressed message to a channel with IPFS content storage
-    pub fn broadcast_message_compressed(
-        ctx: Context<BroadcastMessageCompressed>,
-        content: String,
-        message_type: MessageType,
-        reply_to: Option<Pubkey>,
-        ipfs_hash: String,
+    /// Verify ZK compressed state using Light-SDK
+    pub fn verify_compression(
+        ctx: Context<VerifyCompressedState>,
+        proof: Vec<u8>,
+        root: [u8; 32],
     ) -> Result<()> {
-        let participant = &ctx.accounts.participant_account;
-        let channel = &ctx.accounts.channel_account;
-        let clock = Clock::get()?;
-
-        // Validate content length for IPFS storage
-        if content.len() > MAX_MESSAGE_CONTENT_LENGTH * 10 {
-            return Err(PodComError::MessageContentTooLong.into());
-        }
-
-        // Verify user is an active participant
-        if !participant.is_active {
-            return Err(PodComError::NotInChannel.into());
-        }
-
-        // Rate limiting (same as regular messages)
-        let current_time = clock.unix_timestamp;
-        let participant = &mut ctx.accounts.participant_account;
-
-        if participant.last_message_at > 0 {
-            let time_since_last = current_time - participant.last_message_at;
-            if time_since_last < 1 {
-                return Err(PodComError::RateLimitExceeded.into());
-            }
-            if time_since_last < 60 {
-                if participant.messages_sent >= RATE_LIMIT_MESSAGES_PER_MINUTE as u64 {
-                    return Err(PodComError::RateLimitExceeded.into());
-                }
-                participant.messages_sent += 1;
-            } else {
-                participant.messages_sent = 1;
-            }
-        } else {
-            participant.messages_sent = 1;
-        }
-        participant.last_message_at = current_time;
-
-        // Create content hash
-        let (content_hash, _) = hash_to_bn254_field_size_be(&content.as_bytes()).unwrap();
-
-        // Create compressed message data
-        let compressed_message = CompressedChannelMessage {
-            channel: channel.key(),
-            sender: participant.participant,
-            content_hash,
-            ipfs_hash: ipfs_hash.clone(),
-            message_type,
-            created_at: clock.unix_timestamp,
-            edited_at: None,
-            reply_to,
-        };
-
-        // Compress the account using Light Protocol
-        let compressed_account_data = borsh::to_vec(&compressed_message)?;
-
-        let cpi_accounts = CompressAccount {
-            fee_payer: ctx.accounts.fee_payer.to_account_info(),
-            authority: ctx.accounts.authority.to_account_info(),
-            light_system_program: ctx.accounts.light_system_program.to_account_info(),
-            registered_program_id: ctx.accounts.registered_program_id.to_account_info(),
-            noop_program: ctx.accounts.noop_program.to_account_info(),
-            account_compression_authority: ctx
-                .accounts
-                .account_compression_authority
-                .to_account_info(),
-            account_compression_program: ctx.accounts.account_compression_program.to_account_info(),
-            merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-            nullifier_queue: ctx.accounts.nullifier_queue.to_account_info(),
-            cpi_authority_pda: ctx.accounts.cpi_authority_pda.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.light_system_program.to_account_info(),
-            cpi_accounts,
-        );
-        compress_account(cpi_ctx, compressed_account_data, None)?;
-
-        // Emit event for indexing
-        emit!(MessageBroadcast {
-            channel: channel.key(),
-            sender: participant.participant,
-            message_type,
-            timestamp: clock.unix_timestamp,
-        });
-
-        msg!(
-            "Compressed message broadcasted to channel: {:?}, IPFS: {}",
-            channel.name,
-            ipfs_hash
-        );
+        verify_zk_compression(ctx.accounts, &proof, &root)?;
         Ok(())
     }
 
-    /// Join a channel with compressed participant data
-    pub fn join_channel_compressed(
-        ctx: Context<JoinChannelCompressed>,
-        metadata_hash: [u8; 32],
-    ) -> Result<()> {
-        let channel = &mut ctx.accounts.channel_account;
-        let agent = &ctx.accounts.agent_account;
-        let clock = Clock::get()?;
-
-        // Check channel capacity
-        if channel.current_participants >= channel.max_participants {
-            return Err(PodComError::ChannelFull.into());
-        }
-
-        // For private channels, verify invitation
-        if channel.visibility == ChannelVisibility::Private {
-            let invitation = &ctx
-                .accounts
-                .invitation_account
-                .as_ref()
-                .ok_or(PodComError::PrivateChannelRequiresInvitation)?;
-
-            if invitation.invitee != ctx.accounts.authority.key() {
-                return Err(PodComError::Unauthorized.into());
-            }
-            if clock.unix_timestamp > invitation.expires_at {
-                return Err(PodComError::MessageExpired.into());
-            }
-            if !invitation.is_accepted {
-                return Err(PodComError::Unauthorized.into());
-            }
-        }
-
-        // Use provided metadata_hash for participant compression
-        let metadata_hash = metadata_hash;
-
-        let compressed_participant = CompressedChannelParticipant {
-            channel: channel.key(),
-            participant: agent.key(),
-            joined_at: clock.unix_timestamp,
-            messages_sent: 0,
-            last_message_at: 0,
-            metadata_hash,
-        };
-
-        // Compress the participant account
-        let compressed_account_data = borsh::to_vec(&compressed_participant)?;
-
-        let cpi_accounts = CompressAccount {
-            fee_payer: ctx.accounts.fee_payer.to_account_info(),
-            authority: ctx.accounts.authority.to_account_info(),
-            light_system_program: ctx.accounts.light_system_program.to_account_info(),
-            registered_program_id: ctx.accounts.registered_program_id.to_account_info(),
-            noop_program: ctx.accounts.noop_program.to_account_info(),
-            account_compression_authority: ctx
-                .accounts
-                .account_compression_authority
-                .to_account_info(),
-            account_compression_program: ctx.accounts.account_compression_program.to_account_info(),
-            merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-            nullifier_queue: ctx.accounts.nullifier_queue.to_account_info(),
-            cpi_authority_pda: ctx.accounts.cpi_authority_pda.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.light_system_program.to_account_info(),
-            cpi_accounts,
-        );
-        compress_account(cpi_ctx, compressed_account_data, None)?;
-
-        // Update channel participant count
-        channel.current_participants += 1;
-
-        // Emit event
-        emit!(ChannelJoined {
-            channel: channel.key(),
-            participant: agent.key(),
-            timestamp: clock.unix_timestamp,
-        });
-
-        msg!("Agent joined channel with compression: {:?}", channel.name);
-        Ok(())
-    }
-
-    /// Batch sync compressed messages - periodically sync state to chain
-    pub fn batch_sync_compressed_messages(
-        ctx: Context<BatchSyncCompressedMessages>,
-        message_hashes: Vec<[u8; 32]>,
-        sync_timestamp: i64,
-    ) -> Result<()> {
-        let channel = &mut ctx.accounts.channel_account;
-        let clock = Clock::get()?;
-
-        // Validate batch size (prevent spam)
-        if message_hashes.len() > 100 {
-            return Err(PodComError::RateLimitExceeded.into());
-        }
-
-        // Verify authority is channel creator or has permissions
-        if channel.creator != ctx.accounts.authority.key() {
-            return Err(PodComError::Unauthorized.into());
-        }
-
-        // Create batch sync proof using Light Protocol's batch compression
-        for (i, hash) in message_hashes.iter().enumerate() {
-            // Each hash represents a compressed message that was stored off-chain
-            // Verify the hash and create compressed account
-            let cpi_accounts = CompressAccount {
-                fee_payer: ctx.accounts.fee_payer.to_account_info(),
-                authority: ctx.accounts.authority.to_account_info(),
-                light_system_program: ctx.accounts.light_system_program.to_account_info(),
-                registered_program_id: ctx.accounts.registered_program_id.to_account_info(),
-                noop_program: ctx.accounts.noop_program.to_account_info(),
-                account_compression_authority: ctx
-                    .accounts
-                    .account_compression_authority
-                    .to_account_info(),
-                account_compression_program: ctx
-                    .accounts
-                    .account_compression_program
-                    .to_account_info(),
-                merkle_tree: ctx.accounts.merkle_tree.to_account_info(),
-                nullifier_queue: ctx.accounts.nullifier_queue.to_account_info(),
-                cpi_authority_pda: ctx.accounts.cpi_authority_pda.to_account_info(),
-            };
-            let cpi_ctx = CpiContext::new(
-                ctx.accounts.light_system_program.to_account_info(),
-                cpi_accounts,
-            );
-            compress_account(cpi_ctx, hash.to_vec(), None)?;
-        }
-
-        msg!(
-            "Batch synced {} compressed messages at timestamp: {}",
-            message_hashes.len(),
-            sync_timestamp
-        );
-        Ok(())
-    }
 }
 
 // Contexts
@@ -1459,91 +1182,12 @@ pub struct CreateChannelV2<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// =============================================================================
-// ZK COMPRESSION CONTEXT STRUCTS
-// =============================================================================
+
 
 #[derive(Accounts)]
-#[instruction(content: String, message_type: MessageType, reply_to: Option<Pubkey>, ipfs_hash: String)]
-pub struct BroadcastMessageCompressed<'info> {
-    pub channel_account: Account<'info, ChannelAccount>,
+pub struct VerifyCompressedState<'info> {
     #[account(mut)]
-    pub participant_account: Account<'info, ChannelParticipant>,
-    #[account(mut)]
-    pub fee_payer: Signer<'info>,
-    pub authority: Signer<'info>,
-    /// CHECK: Light System Program
-    pub light_system_program: Program<'info, LightSystemProgram>,
-    /// CHECK: Compressed Token Program (Light Protocol)
-    pub compressed_token_program: Program<'info, LightCompressedToken>,
-    /// CHECK: Registered program PDA
-    pub registered_program_id: AccountInfo<'info>,
-    /// CHECK: Noop program for logging
-    pub noop_program: AccountInfo<'info>,
-    /// CHECK: Account compression authority
-    pub account_compression_authority: AccountInfo<'info>,
-    /// CHECK: Account compression program
-    pub account_compression_program: AccountInfo<'info>,
-    /// CHECK: Merkle tree account
-    pub merkle_tree: AccountInfo<'info>,
-    /// CHECK: Nullifier queue account
-    pub nullifier_queue: AccountInfo<'info>,
-    /// CHECK: CPI authority PDA
-    pub cpi_authority_pda: AccountInfo<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(metadata_hash: [u8; 32])]
-pub struct JoinChannelCompressed<'info> {
-    #[account(mut)]
-    pub channel_account: Account<'info, ChannelAccount>,
-    pub agent_account: Account<'info, AgentAccount>,
-    pub invitation_account: Option<Account<'info, ChannelInvitation>>,
-    #[account(mut)]
-    pub fee_payer: Signer<'info>,
-    pub authority: Signer<'info>,
-    /// CHECK: Light System Program
-    pub light_system_program: Program<'info, LightSystemProgram>,
-    /// CHECK: Registered program PDA
-    pub registered_program_id: AccountInfo<'info>,
-    /// CHECK: Noop program for logging
-    pub noop_program: AccountInfo<'info>,
-    /// CHECK: Account compression authority
-    pub account_compression_authority: AccountInfo<'info>,
-    /// CHECK: Account compression program
-    pub account_compression_program: AccountInfo<'info>,
-    /// CHECK: Merkle tree account
-    pub merkle_tree: AccountInfo<'info>,
-    /// CHECK: Nullifier queue account
-    pub nullifier_queue: AccountInfo<'info>,
-    /// CHECK: CPI authority PDA
-    pub cpi_authority_pda: AccountInfo<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(message_hashes: Vec<[u8; 32]>, sync_timestamp: i64)]
-pub struct BatchSyncCompressedMessages<'info> {
-    #[account(mut)]
-    pub channel_account: Account<'info, ChannelAccount>,
-    #[account(mut)]
-    pub fee_payer: Signer<'info>,
-    pub authority: Signer<'info>,
-    /// CHECK: Light System Program
-    pub light_system_program: Program<'info, LightSystemProgram>,
-    /// CHECK: Compressed Token Program (Light Protocol)
-    pub compressed_token_program: Program<'info, LightCompressedToken>,
-    /// CHECK: Registered program PDA
-    pub registered_program_id: AccountInfo<'info>,
-    /// CHECK: Noop program for logging
-    pub noop_program: AccountInfo<'info>,
-    /// CHECK: Account compression authority
-    pub account_compression_authority: AccountInfo<'info>,
-    /// CHECK: Account compression program
-    pub account_compression_program: AccountInfo<'info>,
-    /// CHECK: Merkle tree account
-    pub merkle_tree: AccountInfo<'info>,
-    /// CHECK: Nullifier queue account
-    pub nullifier_queue: AccountInfo<'info>,
-    /// CHECK: CPI authority PDA
-    pub cpi_authority_pda: AccountInfo<'info>,
+    pub state_account: AccountInfo<'info>,
+    /// CHECK: Light verifier program
+    pub zk_program: AccountInfo<'info>,
 }
