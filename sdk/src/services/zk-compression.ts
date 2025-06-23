@@ -9,6 +9,7 @@ import { createMint, mintTo, transfer } from '@lightprotocol/compressed-token';
 /**
  * Compressed account information returned by Light Protocol
  */
+import { PhotonClient } from "./photon.js";
 export interface CompressedAccount {
   /** Address of the compressed account */
   hash: string;
@@ -103,6 +104,7 @@ export class ZKCompressionService extends BaseService {
   private config: ZKCompressionConfig;
   private rpc: Rpc;
   private ipfsService: IPFSService;
+  private photon: PhotonClient;
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
   private lastBatchResult?: { signature: string; compressedAccounts: any[] };
@@ -136,6 +138,7 @@ export class ZKCompressionService extends BaseService {
     );
 
     this.ipfsService = ipfsService;
+    this.photon = new PhotonClient(this.config.photonIndexerUrl!);
 
     if (this.config.enableBatching) {
       this.startBatchTimer();
@@ -388,33 +391,14 @@ export class ZKCompressionService extends BaseService {
     } = {}
   ): Promise<CompressedChannelMessage[]> {
     try {
-      // Query compressed messages via Photon indexer JSON-RPC
-      const rpcReq = {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: 'getCompressedMessagesByChannel',
-        params: [
-          channelId.toString(),
-          options.limit ?? 50,
-          options.offset ?? 0,
-          options.sender?.toString() || null,
-          options.after?.getTime() || null,
-          options.before?.getTime() || null,
-        ],
-      };
-      const response = await fetch(this.config.photonIndexerUrl!, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rpcReq),
+      const raw = await this.photon.getCompressedMessagesByChannel(channelId.toString(), {
+        limit: options.limit,
+        offset: options.offset,
+        sender: options.sender?.toString() || null,
+        after: options.after?.getTime() || null,
+        before: options.before?.getTime() || null,
       });
-      if (!response.ok) {
-        throw new Error(`Indexer RPC failed: ${response.statusText}`);
-      }
-      const json = await response.json() as { result?: any[], error?: { message?: string } };
-      if (json.error) {
-        throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
-      }
-      const raw = json.result || [];
+
       return raw.map(m => ({
         channel: new PublicKey(m.channel),
         sender: new PublicKey(m.sender),
@@ -440,20 +424,12 @@ export class ZKCompressionService extends BaseService {
     compressionRatio: number;
   }> {
     try {
-      const response = await fetch(
-        `${this.config.photonIndexerUrl}/channel-stats/${channelId.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Stats query failed: ${response.statusText}`);
-      }
-
-      const data = await response.json() as any;
+      const data = await this.photon.getChannelStats(channelId.toString());
       return {
         totalMessages: data.totalMessages || 0,
         totalParticipants: data.totalParticipants || 0,
         storageSize: data.storageSize || 0,
-        compressionRatio: data.compressionRatio || 1.0
+        compressionRatio: data.compressionRatio || 1.0,
       };
     } catch (error) {
       throw new Error(`Failed to get channel stats: ${error}`);
@@ -516,40 +492,18 @@ export class ZKCompressionService extends BaseService {
     wallet: any
   ): Promise<any> {
     try {
-      const program = this.ensureInitialized();
-      
-      // Implement Light Protocol integration
-      const tx = await (program as any).methods
-        .broadcastMessageCompressed(
-          message.contentHash, // Use content hash instead of full content
-          message.messageType,
-          message.replyTo || null,
-          message.ipfsHash
-        )
-        .accounts({
-          channelAccount: message.channel,
-          participantAccount: message.sender,
-          feePayer: wallet.publicKey,
-          authority: wallet.publicKey,
-          lightSystemProgram: new PublicKey('H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN'),
-          compressedTokenProgram: new PublicKey('cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m'),
-          registeredProgramId: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          noopProgram: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          accountCompressionAuthority: new PublicKey('5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW'),
-          accountCompressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
-          merkleTree: message.channel,
-          nullifierQueue: this.config.nullifierQueuePubkey,
-        cpiAuthorityPda: this.config.cpiAuthorityPda,
-        })
-        .transaction();
-
-      const provider = program.provider as AnchorProvider;
-      const signature = await provider.sendAndConfirm(tx);
+      const instruction = await this.createCompressionInstruction(
+        message.channel,
+        message,
+        wallet.publicKey
+      );
+      const transaction = new Transaction().add(instruction);
+      const signature = await this.rpc.sendTransaction(transaction, []);
 
       return {
         signature,
         ipfsResult,
-        compressedAccount: { hash: '', data: message },
+        compressedAccount: { hash: message.contentHash, data: message },
       };
     } catch (error) {
       throw new Error(`Failed to process compressed message: ${error}`);
@@ -631,13 +585,13 @@ export class ZKCompressionService extends BaseService {
     message: CompressedChannelMessage,
     authority: PublicKey
   ): Promise<TransactionInstruction> {
-    // Create a simple transaction instruction for compression
-    // This is a placeholder implementation that should be replaced with actual Light Protocol integration
-    const { SystemProgram } = await import('@solana/web3.js');
-    return SystemProgram.transfer({
-      fromPubkey: authority,
-      toPubkey: merkleTree,
+    const infos = await this.rpc.getStateTreeInfos();
+    const treeInfo = infos[0];
+    return await LightSystemProgram.compress({
+      payer: this.wallet,
+      toAddress: merkleTree,
       lamports: 0,
+      outputStateTreeInfo: treeInfo,
     });
   }
 
