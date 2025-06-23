@@ -473,10 +473,19 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      const [updatedTreeInfo] = await this.rpc.getStateTreeInfos();
+
       return {
         signature,
-        compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
+        compressedAccounts: messageHashes.map((h) => ({
+          hash: h,
+          data: undefined,
+        })),
+        merkleRoot:
+          (updatedTreeInfo as any).merkleRoot ||
+          (updatedTreeInfo as any).newRoot ||
+          (updatedTreeInfo as any).root ||
+          '',
       };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);
@@ -705,13 +714,19 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      const [updatedTreeInfo] = await this.rpc.getStateTreeInfos();
+
       const result = {
         signature,
         compressedAccounts: batch.map((msg) => ({
           hash: msg.contentHash,
           data: msg,
         })),
-        merkleRoot: '',
+        merkleRoot:
+          (updatedTreeInfo as any).merkleRoot ||
+          (updatedTreeInfo as any).newRoot ||
+          (updatedTreeInfo as any).root ||
+          '',
       };
 
       this.lastBatchResult = {
