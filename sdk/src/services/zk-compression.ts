@@ -131,6 +131,18 @@ export class ZKCompressionService extends BaseService {
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
   private lastBatchResult?: { signature: string; compressedAccounts: any[] };
+  private pendingBatches: Map<
+    string,
+    {
+      resolve: (value: {
+        signature: string;
+        ipfsResult: IPFSStorageResult;
+        compressedAccount: CompressedAccount;
+      }) => void;
+      reject: (reason?: any) => void;
+      ipfs: IPFSStorageResult;
+    }
+  > = new Map();
 
   constructor(
     baseConfig: BaseServiceConfig,
@@ -275,48 +287,23 @@ export class ZKCompressionService extends BaseService {
       };
 
       if (this.config.enableBatching) {
-        // Add to batch queue
+        // Add to batch queue and track pending promise
         this.batchQueue.push(compressedMessage);
-        
-        if (this.batchQueue.length >= this.config.maxBatchSize) {
-          return await this.processBatch(wallet);
-        }
-
-        // Return promise that resolves when batch is processed
         return new Promise((resolve, reject) => {
-          const checkBatch = () => {
-            // Check if message was processed in a batch
-            const processedIndex = this.batchQueue.findIndex(
-              msg => msg.contentHash === compressedMessage.contentHash
-            );
-            
-            if (processedIndex === -1) {
-              // Message was processed, return success
-              const batchResult = this.lastBatchResult || {
-                signature: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                compressedAccounts: []
-              };
-              
-              resolve({
-                signature: batchResult.signature,
-                ipfsResult,
-                compressedAccount: { 
-                  hash: compressedMessage.contentHash, 
-                  data: compressedMessage 
-                },
-              });
-            } else {
-              // Still in queue, check again after timeout
-              setTimeout(checkBatch, 100);
-            }
-          };
-          
-          // Start checking after a short delay
-          setTimeout(checkBatch, 50);
-          
+          this.pendingBatches.set(compressedMessage.contentHash, {
+            resolve,
+            reject,
+            ipfs: ipfsResult,
+          });
+          // Force batch immediately if we hit max size
+          if (this.batchQueue.length >= this.config.maxBatchSize) {
+            this.processBatch(wallet).catch(reject);
+          }
           // Timeout after 30 seconds
           setTimeout(() => {
-            reject(new Error('Batch processing timeout'));
+            if (this.pendingBatches.delete(compressedMessage.contentHash)) {
+              reject(new Error('Batch processing timeout'));
+            }
           }, 30000);
         });
       } else {
@@ -473,10 +460,12 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      const [treeInfo] = await this.rpc.getStateTreeInfos();
+
       return {
         signature,
-        compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
+        compressedAccounts: [],
+        merkleRoot: (treeInfo as any).newRoot || (treeInfo as any).root || '',
       };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);
@@ -711,13 +700,25 @@ export class ZKCompressionService extends BaseService {
           hash: msg.contentHash,
           data: msg,
         })),
-        merkleRoot: '',
+        merkleRoot: (treeInfo as any).newRoot || (treeInfo as any).root || '',
       };
 
       this.lastBatchResult = {
         signature: result.signature,
         compressedAccounts: result.compressedAccounts,
       };
+
+      for (const msg of batch) {
+        const pending = this.pendingBatches.get(msg.contentHash);
+        if (pending) {
+          pending.resolve({
+            signature: result.signature,
+            ipfsResult: pending.ipfs,
+            compressedAccount: { hash: msg.contentHash, data: msg },
+          });
+          this.pendingBatches.delete(msg.contentHash);
+        }
+      }
 
       return result;
     } catch (error) {
