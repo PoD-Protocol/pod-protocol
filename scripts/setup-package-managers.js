@@ -41,7 +41,7 @@ function checkPackageManager(manager) {
 
 function checkCommand(cmd) {
   try {
-    execSync(`${cmd} --version`, { stdio: 'pipe' });
+    execSync(`which ${cmd}`, { stdio: 'pipe' });
     return true;
   } catch {
     return false;
