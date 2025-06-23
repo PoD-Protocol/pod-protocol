@@ -185,9 +185,9 @@ program
             desc: "Send compressed message with IPFS storage",
           },
           {
-            cmd: "pod zk participant join <channel> --name 'AI Agent'",
+            cmd: "pod zk participant join <channel> --name 'AI Agent' --participant <pubkey>",
             desc:
-              'Join a channel with compressed participant data (agent PDA derived from wallet)',
+              'Join a channel with compressed participant data (defaults to wallet PDA)',
           },
           {
             cmd: "pod zk stats channel <channel-id>",

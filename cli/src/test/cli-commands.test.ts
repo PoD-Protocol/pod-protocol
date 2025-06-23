@@ -119,4 +119,17 @@ describe("CLI Command Tests", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("PoD Protocol Status");
   });
+
+  it("participant join invalid custom key", async () => {
+    const res = await runCli([
+      "zk",
+      "participant",
+      "join",
+      "11111111111111111111111111111111111111111111",
+      "--participant",
+      "badkey",
+    ]);
+    expect(res.exitCode).toBe(1);
+    expect(res.stderr).toContain("Invalid participant");
+  });
 });
