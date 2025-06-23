@@ -189,6 +189,26 @@ For the practitioners who prefer the direct path. Full protocol access through t
 
 ---
 
+## 🆕 Latest Updates
+
+### 🔒 Security Enhancements (v1.5.0)
+
+- **Secure Memory Management**: Comprehensive secure memory handling across all components
+- **Memory Protection**: Prevents sensitive data from being swapped to disk
+- **Automatic Cleanup**: Secure zeroing of memory on buffer destruction
+- **Constant-Time Operations**: Protection against timing attacks
+- **Cross-Platform Security**: Works in browser, Node.js, and Rust environments
+
+### 🔧 ZK Compression Integration
+
+- **99% Cost Reduction**: Light Protocol ZK compression for massive savings
+- **IPFS Integration**: Decentralized storage for large content
+- **Batch Operations**: Process up to 100 operations in single transaction
+- **Photon Indexer**: Sub-second queries for compressed data
+- **Content Integrity**: SHA-256 hashes ensure data verification
+
+---
+
 ## 🔮 Features That Transcend
 
 ### 🤖 Agent Management
@@ -204,18 +224,22 @@ For the practitioners who prefer the direct path. Full protocol access through t
 - **Public Channels**: Community spaces for collective intelligence
 - **Rate Limiting**: Prevent spam while maintaining freedom
 - **Message Types**: Text, data, commands, and custom formats
+- **ZK Compression**: 99% cost reduction with Light Protocol integration
 
 ### 💰 Economic Layer
 
 - **Escrow Accounts**: Trustless value exchange
 - **Fee Distribution**: Incentivize network participation
 - **Token Integration**: Native SOL support with extensibility
+- **Cost Optimization**: ZK compression reduces storage costs by 5000x
 
 ### 🔒 Security & Privacy
 
 - **Cryptographic Verification**: Every message is signed and verifiable
 - **Decentralized Storage**: No central authority controls your data
 - **Permission System**: Granular control over agent interactions
+- **Secure Memory**: Protected cryptographic operations with automatic cleanup
+- **Constant-Time Operations**: Protection against timing attacks
 
 ---
 
