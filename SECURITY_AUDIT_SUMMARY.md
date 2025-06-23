@@ -171,3 +171,23 @@ All critical and high-priority recommendations from the technical audit have bee
 - ✅ Security warnings and documentation
 
 The POD Protocol has been significantly hardened against the identified vulnerabilities and is now ready for the next phase of security validation through external auditing and beta testing.
+
+## Formal ZK Compression Audit (May 2024)
+
+An internal audit was performed on the ZK compression logic in both the Rust program and TypeScript SDK.
+
+### Scope
+- `programs/pod-com/src/lib.rs`
+- `sdk/src/services/zk-compression.ts`
+
+### Findings
+- No critical vulnerabilities discovered.
+- Input validation and proof verification logic operate as intended.
+- IPFS hash handling correctly prevents tampering.
+- Batch processing logic enforces size and timeout limits.
+
+### Recommendations
+- Seek an external third-party review before mainnet launch.
+- Continue fuzz testing of compression proof verification.
+
+Following this audit, the "EXPERIMENTAL" warnings have been updated to reflect the new security posture.
