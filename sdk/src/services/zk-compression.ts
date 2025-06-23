@@ -2,6 +2,7 @@ import { AnchorProvider } from '@coral-xyz/anchor';
 import { BaseService, BaseServiceConfig } from './base.js';
 import { IPFSService, IPFSStorageResult } from './ipfs.js';
 import { Transaction, TransactionInstruction, PublicKey, Connection } from '@solana/web3.js';
+import { PhotonIndexerClient } from './photon-indexer-client.js';
 
 import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
 import { createMint, mintTo, transfer, CompressedTokenProgram } from '@lightprotocol/compressed-token';
@@ -131,6 +132,7 @@ export class ZKCompressionService extends BaseService {
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
   private lastBatchResult?: { signature: string; compressedAccounts: any[] };
+  private indexerClient: PhotonIndexerClient;
 
   constructor(
     baseConfig: BaseServiceConfig,
@@ -214,6 +216,7 @@ export class ZKCompressionService extends BaseService {
     );
 
     this.ipfsService = ipfsService;
+    this.indexerClient = new PhotonIndexerClient(this.config.photonIndexerUrl);
 
     if (this.config.enableBatching) {
       this.startBatchTimer();
@@ -497,33 +500,16 @@ export class ZKCompressionService extends BaseService {
     } = {}
   ): Promise<CompressedChannelMessage[]> {
     try {
-      // Query compressed messages via Photon indexer JSON-RPC
-      const rpcReq = {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: 'getCompressedMessagesByChannel',
-        params: [
-          channelId.toString(),
-          options.limit ?? 50,
-          options.offset ?? 0,
-          options.sender?.toString() || null,
-          options.after?.getTime() || null,
-          options.before?.getTime() || null,
-        ],
-      };
-      const response = await fetch(this.config.photonIndexerUrl!, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rpcReq),
-      });
-      if (!response.ok) {
-        throw new Error(`Indexer RPC failed: ${response.statusText}`);
-      }
-      const json = await response.json() as { result?: any[], error?: { message?: string } };
-      if (json.error) {
-        throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
-      }
-      const raw = json.result || [];
+      const raw = await this.indexerClient.getCompressedMessagesByChannel(
+        channelId.toString(),
+        {
+          limit: options.limit,
+          offset: options.offset,
+          sender: options.sender?.toString() || null,
+          after: options.after?.getTime() || null,
+          before: options.before?.getTime() || null,
+        },
+      );
       return raw.map(m => ({
         channel: new PublicKey(m.channel),
         sender: new PublicKey(m.sender),

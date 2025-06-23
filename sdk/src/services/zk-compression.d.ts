@@ -121,6 +121,7 @@ export declare class ZKCompressionService extends BaseService {
     private batchQueue;
     private batchTimer?;
     private lastBatchResult?;
+    private indexerClient;
     constructor(baseConfig: BaseServiceConfig, zkConfig: Partial<ZKCompressionConfig>, ipfsService: IPFSService, wallet?: any);
     /**
      * Broadcast a compressed message to a channel

@@ -1,0 +1,64 @@
+export interface PhotonCompressedMessage {
+  channel: string;
+  sender: string;
+  content_hash: string;
+  ipfs_hash: string;
+  message_type: string;
+  created_at: number;
+  edited_at?: number;
+  reply_to?: string;
+}
+
+export interface QueryOptions {
+  limit?: number;
+  offset?: number;
+  sender?: string | null;
+  after?: number | null;
+  before?: number | null;
+}
+
+export class PhotonIndexerClient {
+  constructor(private endpoint: string) {}
+
+  async getCompressedMessagesByChannel(
+    channelId: string,
+    options: QueryOptions = {}
+  ): Promise<PhotonCompressedMessage[]> {
+    const rpcReq = {
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'getCompressedMessagesByChannel',
+      params: [
+        channelId,
+        options.limit ?? 50,
+        options.offset ?? 0,
+        options.sender ?? null,
+        options.after ?? null,
+        options.before ?? null,
+      ],
+    };
+
+    const response = await fetch(this.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(rpcReq),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Indexer RPC failed: ${response.statusText}`);
+    }
+
+    const json = (await response.json()) as {
+      result?: PhotonCompressedMessage[];
+      error?: { message?: string };
+    };
+
+    if (json.error) {
+      throw new Error(
+        `Indexer RPC error: ${json.error.message || 'Unknown error'}`
+      );
+    }
+
+    return json.result ?? [];
+  }
+}

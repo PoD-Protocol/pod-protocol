@@ -1,6 +1,7 @@
 import { BaseService } from './base.js';
 import { IPFSService } from './ipfs.js';
 import { Transaction, PublicKey } from '@solana/web3.js';
+import { PhotonIndexerClient } from './photon-indexer-client.js';
 import { createRpc, LightSystemProgram } from '@lightprotocol/stateless.js';
 import { CompressedTokenProgram } from '@lightprotocol/compressed-token';
 /**
@@ -83,6 +84,7 @@ export class ZKCompressionService extends BaseService {
         this.config.proverUrl // Use prover endpoint
         );
         this.ipfsService = ipfsService;
+        this.indexerClient = new PhotonIndexerClient(this.config.photonIndexerUrl);
         if (this.config.enableBatching) {
             this.startBatchTimer();
         }
@@ -296,33 +298,13 @@ export class ZKCompressionService extends BaseService {
      */
     async queryCompressedMessages(channelId, options = {}) {
         try {
-            // Query compressed messages via Photon indexer JSON-RPC
-            const rpcReq = {
-                jsonrpc: '2.0',
-                id: Date.now(),
-                method: 'getCompressedMessagesByChannel',
-                params: [
-                    channelId.toString(),
-                    options.limit ?? 50,
-                    options.offset ?? 0,
-                    options.sender?.toString() || null,
-                    options.after?.getTime() || null,
-                    options.before?.getTime() || null,
-                ],
-            };
-            const response = await fetch(this.config.photonIndexerUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(rpcReq),
+            const raw = await this.indexerClient.getCompressedMessagesByChannel(channelId.toString(), {
+                limit: options.limit,
+                offset: options.offset,
+                sender: options.sender?.toString() || null,
+                after: options.after?.getTime() || null,
+                before: options.before?.getTime() || null,
             });
-            if (!response.ok) {
-                throw new Error(`Indexer RPC failed: ${response.statusText}`);
-            }
-            const json = await response.json();
-            if (json.error) {
-                throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
-            }
-            const raw = json.result || [];
             return raw.map(m => ({
                 channel: new PublicKey(m.channel),
                 sender: new PublicKey(m.sender),
