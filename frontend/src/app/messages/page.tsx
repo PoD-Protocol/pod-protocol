@@ -1,65 +1,141 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Search, MoreVertical, Phone, Video, Info, Paperclip, Smile } from 'lucide-react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import useStore from '@/components/store/useStore';
-import { Message, Agent, MessageType, MessageStatus } from '@/components/store/types';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Send,
+  Search,
+  MoreVertical,
+  Phone,
+  Video,
+  Info,
+  Paperclip,
+  Smile,
+} from "lucide-react";
+import DashboardLayout from "@/components/layout/DashboardLayout";
+import useStore from "@/components/store/useStore";
+import {
+  Message,
+  Agent,
+  MessageType,
+  MessageStatus,
+} from "@/components/store/types";
+import usePodClient from "@/hooks/usePodClient";
+import {
+  PublicKey,
+  MessageStatus as SDKMessageStatus,
+} from "@pod-protocol/sdk";
+
+function mapStatus(status: SDKMessageStatus): MessageStatus {
+  switch (status) {
+    case SDKMessageStatus.Delivered:
+      return MessageStatus.DELIVERED;
+    case SDKMessageStatus.Read:
+      return MessageStatus.READ;
+    case SDKMessageStatus.Failed:
+      return MessageStatus.FAILED;
+    case SDKMessageStatus.Pending:
+    default:
+      return MessageStatus.SENT;
+  }
+}
 
 export default function MessagesPage() {
-  const { messages, agents, user, addMessage } = useStore();
+  const { messages, agents, user, addMessage, setMessages } = useStore();
+  const client = usePodClient();
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [newMessage, setNewMessage] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [newMessage, setNewMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [conversations, setConversations] = useState<
+    {
+      agent: Agent;
+      lastMessage: Message | null;
+      unreadCount: number;
+    }[]
+  >([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Mock conversations data
-  const conversations = agents.slice(0, 5).map(agent => {
-    // Find last message for this agent across all channels
-    let lastMessage = null;
-    for (const channelMessages of Object.values(messages)) {
-      const agentMessages = channelMessages.filter(m => 
-        m.senderId === agent.id || (m.senderType === 'user' && user && m.senderId === user.id)
-      );
-      if (agentMessages.length > 0) {
-        const latest = agentMessages[agentMessages.length - 1];
-        if (!lastMessage || latest.timestamp > lastMessage.timestamp) {
-          lastMessage = latest;
-        }
-      }
-    }
-    
-    return {
-      agent,
-      lastMessage,
-      unreadCount: Math.floor(Math.random() * 5)
-    };
-  });
+  // Load conversations from the backend
+  useEffect(() => {
+    const loadConversations = async () => {
+      if (!user) return;
 
-  const filteredConversations = conversations.filter(conv =>
-    conv.agent.name.toLowerCase().includes(searchQuery.toLowerCase())
+      try {
+        const convs = await Promise.all(
+          agents.slice(0, 5).map(async (agent) => {
+            try {
+              const fetched = await client.messages.getAgentMessages(
+                new PublicKey(agent.id),
+                50,
+              );
+
+              const processed: Message[] = fetched.map((m) => ({
+                id: m.pubkey.toBase58(),
+                channelId: `${user.id}-${agent.id}`,
+                senderId: m.sender.toBase58(),
+                senderType: m.sender.toBase58() === user.id ? "user" : "agent",
+                content: m.payload,
+                type: MessageType.TEXT,
+                timestamp: new Date(m.timestamp),
+                attachments: [],
+                reactions: [],
+                status: mapStatus(m.status),
+              }));
+
+              if (processed.length > 0) {
+                setMessages(`${user.id}-${agent.id}`, processed);
+              }
+
+              return {
+                agent,
+                lastMessage: processed.length
+                  ? processed[processed.length - 1]
+                  : null,
+                unreadCount: 0,
+              };
+            } catch (err) {
+              console.error("Failed to fetch messages for", agent.id, err);
+              return { agent, lastMessage: null, unreadCount: 0 };
+            }
+          }),
+        );
+
+        setConversations(convs);
+      } catch (err) {
+        console.error("Failed to load conversations", err);
+      }
+    };
+
+    loadConversations();
+  }, [agents, client, setMessages, user]);
+
+  const filteredConversations = conversations.filter((conv) =>
+    conv.agent.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const currentMessages = useMemo(() => {
     if (!selectedAgent || !user) return [];
-    
+
     // Find messages for this agent across all channels
     const allMessages = [];
     for (const channelMessages of Object.values(messages)) {
-      const agentMessages = channelMessages.filter(m => 
-        m.senderId === selectedAgent.id || 
-        (m.senderType === 'user' && m.senderId === user.id)
+      const agentMessages = channelMessages.filter(
+        (m) =>
+          m.senderId === selectedAgent.id ||
+          (m.senderType === "user" && m.senderId === user.id),
       );
       allMessages.push(...agentMessages);
     }
-    
+
     // Sort by timestamp
-    return allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return allMessages.sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
   }, [selectedAgent, messages, user]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -74,21 +150,21 @@ export default function MessagesPage() {
       id: Date.now().toString(),
       channelId,
       senderId: user.id,
-      senderType: 'user',
+      senderType: "user",
       content: newMessage,
       type: MessageType.TEXT,
       timestamp: new Date(),
       attachments: [],
       reactions: [],
-      status: MessageStatus.SENT
+      status: MessageStatus.SENT,
     };
 
     addMessage(channelId, message);
-    setNewMessage('');
+    setNewMessage("");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -118,10 +194,10 @@ export default function MessagesPage() {
             {filteredConversations.map((conv) => (
               <motion.div
                 key={conv.agent.id}
-                whileHover={{ backgroundColor: 'rgba(139, 92, 246, 0.1)' }}
+                whileHover={{ backgroundColor: "rgba(139, 92, 246, 0.1)" }}
                 onClick={() => setSelectedAgent(conv.agent)}
                 className={`p-4 cursor-pointer border-b border-purple-500/10 transition-colors ${
-                  selectedAgent?.id === conv.agent.id ? 'bg-purple-500/20' : ''
+                  selectedAgent?.id === conv.agent.id ? "bg-purple-500/20" : ""
                 }`}
               >
                 <div className="flex items-center space-x-3">
@@ -133,7 +209,9 @@ export default function MessagesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-white font-medium truncate">{conv.agent.name}</h3>
+                      <h3 className="text-white font-medium truncate">
+                        {conv.agent.name}
+                      </h3>
                       {conv.unreadCount > 0 && (
                         <span className="bg-purple-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
                           {conv.unreadCount}
@@ -141,10 +219,10 @@ export default function MessagesPage() {
                       )}
                     </div>
                     <p className="text-purple-300 text-sm truncate">
-                      {conv.lastMessage?.content || 'No messages yet'}
+                      {conv.lastMessage?.content || "No messages yet"}
                     </p>
                     <p className="text-purple-400 text-xs mt-1">
-                      {conv.lastMessage?.timestamp.toLocaleTimeString() || ''}
+                      {conv.lastMessage?.timestamp.toLocaleTimeString() || ""}
                     </p>
                   </div>
                 </div>
@@ -164,8 +242,12 @@ export default function MessagesPage() {
                     {selectedAgent.name.charAt(0)}
                   </div>
                   <div>
-                    <h2 className="text-white font-semibold">{selectedAgent.name}</h2>
-                    <p className="text-purple-300 text-sm">{selectedAgent.description}</p>
+                    <h2 className="text-white font-semibold">
+                      {selectedAgent.name}
+                    </h2>
+                    <p className="text-purple-300 text-sm">
+                      {selectedAgent.description}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -193,13 +275,13 @@ export default function MessagesPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className={`flex ${message.senderId === user?.id ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${message.senderId === user?.id ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                           message.senderId === user?.id
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-700 text-white'
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-700 text-white"
                         }`}
                       >
                         <p className="text-sm">{message.content}</p>
@@ -251,8 +333,12 @@ export default function MessagesPage() {
                 <div className="w-24 h-24 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Send className="w-12 h-12 text-purple-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Select a conversation</h3>
-                <p className="text-purple-300">Choose an agent from the sidebar to start messaging</p>
+                <h3 className="text-xl font-semibold text-white mb-2">
+                  Select a conversation
+                </h3>
+                <p className="text-purple-300">
+                  Choose an agent from the sidebar to start messaging
+                </p>
               </div>
             </div>
           )}
