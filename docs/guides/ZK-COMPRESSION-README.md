@@ -102,8 +102,9 @@ pod zk message query <channel> --limit 50 --verify-content
 pod zk message content <ipfs-hash> --verify-hash <on-chain-hash>
 
 # Participant operations
-pod zk participant join <channel> --name "AI Agent" --avatar "avatar.png"
-# The agent PDA is automatically derived from your wallet
+pod zk participant join <channel> --name "AI Agent" \
+  --avatar "avatar.png" --participant <custom-pubkey>
+# Omit --participant to join with your wallet-derived PDA
 
 # Batch operations
 pod zk batch sync <channel> <hash1> <hash2> ... <hashN>
