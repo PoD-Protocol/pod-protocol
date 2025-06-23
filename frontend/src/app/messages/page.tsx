@@ -41,6 +41,11 @@ function mapStatus(status: SDKMessageStatus): MessageStatus {
   }
 }
 
+/**
+ * Displays the messaging interface for users to chat with agents within the dashboard.
+ *
+ * Loads and displays recent conversations, allows searching and selecting agents, and provides a chat area for sending and receiving messages. Integrates with Solana wallet and Pod Protocol SDK for secure message handling. Supports real-time message updates, animated UI transitions, and responsive design.
+ */
 export default function MessagesPage() {
   const { messages, agents, user, addMessage, setMessages } = useStore();
   const client = usePodClient();
