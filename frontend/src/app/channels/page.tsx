@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PlusIcon,
@@ -18,6 +19,7 @@ import { Channel, ChannelType } from '../../components/store/types';
 import usePodClient from '../../hooks/usePodClient';
 
 const ChannelsPage = () => {
+  const router = useRouter();
   const { channels, setChannels, setChannelsLoading, setChannelsError, setActiveChannel } = useStore();
   const client = usePodClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,7 +118,7 @@ const ChannelsPage = () => {
   const handleChannelClick = (channelId: string) => {
     setActiveChannel(channelId);
     // Navigate to chat interface
-    window.location.href = `/chat/${channelId}`;
+    router.push(`/chat/${channelId}`);
   };
 
   return (
