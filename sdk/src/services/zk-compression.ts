@@ -282,43 +282,14 @@ export class ZKCompressionService extends BaseService {
           return await this.processBatch(wallet);
         }
 
-        // Return promise that resolves when batch is processed
-        return new Promise((resolve, reject) => {
-          const checkBatch = () => {
-            // Check if message was processed in a batch
-            const processedIndex = this.batchQueue.findIndex(
-              msg => msg.contentHash === compressedMessage.contentHash
-            );
-            
-            if (processedIndex === -1) {
-              // Message was processed, return success
-              const batchResult = this.lastBatchResult || {
-                signature: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                compressedAccounts: []
-              };
-              
-              resolve({
-                signature: batchResult.signature,
-                ipfsResult,
-                compressedAccount: { 
-                  hash: compressedMessage.contentHash, 
-                  data: compressedMessage 
-                },
-              });
-            } else {
-              // Still in queue, check again after timeout
-              setTimeout(checkBatch, 100);
-            }
-          };
-          
-          // Start checking after a short delay
-          setTimeout(checkBatch, 50);
-          
-          // Timeout after 30 seconds
-          setTimeout(() => {
-            reject(new Error('Batch processing timeout'));
-          }, 30000);
-        });
+        return {
+          signature: '',
+          ipfsResult,
+          compressedAccount: {
+            hash: compressedMessage.contentHash,
+            data: compressedMessage,
+          },
+        };
       } else {
         // Execute compression via Light Protocol transaction
         const instruction = await this.createCompressionInstruction(channelId, compressedMessage, wallet.publicKey);
@@ -473,10 +444,22 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      const txInfo: any = await this.rpc.getTransactionWithCompressionInfo(
+        signature
+      );
+      const compressedAccounts =
+        txInfo?.compressionInfo?.openedAccounts?.map((acc: any) => ({
+          hash: acc.account.hash.toString(),
+          data: acc.account.data,
+          merkleContext: acc.account.merkleContext,
+        })) || [];
+      const merkleRoot =
+        compressedAccounts[0]?.merkleContext?.root?.toString() || '';
+
       return {
         signature,
-        compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
+        compressedAccounts,
+        merkleRoot,
       };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);
@@ -692,7 +675,7 @@ export class ZKCompressionService extends BaseService {
         source: wallet.publicKey,
         toAddress: toAddresses,
         amount: amounts,
-        mint: this.config.compressedTokenMint, // Use the correct mint address
+        mint: this.config.compressedTokenMint,
         outputStateTreeInfo: treeInfo,
         tokenPoolInfo: null,
       });
@@ -705,14 +688,19 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
-      const result = {
-        signature,
-        compressedAccounts: batch.map((msg) => ({
-          hash: msg.contentHash,
-          data: msg,
-        })),
-        merkleRoot: '',
-      };
+      const txInfo: any = await this.rpc.getTransactionWithCompressionInfo(
+        signature
+      );
+      const compressedAccounts =
+        txInfo?.compressionInfo?.openedAccounts?.map((acc: any) => ({
+          hash: acc.account.hash.toString(),
+          data: acc.account.data,
+          merkleContext: acc.account.merkleContext,
+        })) || [];
+      const merkleRoot =
+        compressedAccounts[0]?.merkleContext?.root?.toString() || '';
+
+      const result = { signature, compressedAccounts, merkleRoot };
 
       this.lastBatchResult = {
         signature: result.signature,
