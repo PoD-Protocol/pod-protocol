@@ -130,7 +130,11 @@ export class ZKCompressionService extends BaseService {
   private ipfsService: IPFSService;
   private batchQueue: CompressedChannelMessage[] = [];
   private batchTimer?: NodeJS.Timeout;
-  private lastBatchResult?: { signature: string; compressedAccounts: any[] };
+  private lastBatchResult?: {
+    signature: string;
+    compressedAccounts: any[];
+    merkleRoot: string;
+  };
 
   constructor(
     baseConfig: BaseServiceConfig,
@@ -294,7 +298,8 @@ export class ZKCompressionService extends BaseService {
               // Message was processed, return success
               const batchResult = this.lastBatchResult || {
                 signature: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                compressedAccounts: []
+                compressedAccounts: [],
+                merkleRoot: ''
               };
               
               resolve({
@@ -705,18 +710,29 @@ export class ZKCompressionService extends BaseService {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
+      const txInfo = await this.rpc.getTransactionWithCompressionInfo(signature);
+      let merkleRoot = '';
+      if (txInfo?.compressionInfo?.openedAccounts?.length) {
+        const ctx = txInfo.compressionInfo.openedAccounts[0].account.merkleContext as any;
+        merkleRoot =
+          ctx?.root?.toString?.() ||
+          ctx?.merkleProof?.root?.toString?.() ||
+          '';
+      }
+
       const result = {
         signature,
         compressedAccounts: batch.map((msg) => ({
           hash: msg.contentHash,
           data: msg,
         })),
-        merkleRoot: '',
+        merkleRoot,
       };
 
       this.lastBatchResult = {
         signature: result.signature,
         compressedAccounts: result.compressedAccounts,
+        merkleRoot: result.merkleRoot,
       };
 
       return result;
