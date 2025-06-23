@@ -121,8 +121,8 @@ export class AgentService extends BaseService {
         // For read operations, use a read-only provider without wallet
         const readOnlyProvider = new anchor.AnchorProvider(
           this.connection,
-          new anchor.Wallet(anchor.web3.Keypair.generate()), // Temporary keypair for read-only operations
-          { commitment: 'confirmed' }
+          {} as anchor.Wallet,
+          anchor.AnchorProvider.defaultOptions()
         );
 
         const idl = this.ensureIDL();
@@ -151,10 +151,10 @@ export class AgentService extends BaseService {
     try {
       // For read operations, use a read-only provider without wallet
       const readOnlyProvider = new anchor.AnchorProvider(
-         this.connection,
-         {} as any, // No wallet needed for read operations
-         { commitment: 'confirmed' }
-       );
+        this.connection,
+        {} as anchor.Wallet,
+        anchor.AnchorProvider.defaultOptions()
+      );
 
        const idl = this.ensureIDL();
        const program = new anchor.Program(idl, readOnlyProvider);
