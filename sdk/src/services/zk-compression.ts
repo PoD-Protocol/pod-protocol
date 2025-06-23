@@ -1,4 +1,5 @@
-import { AnchorProvider } from '@coral-xyz/anchor';
+import anchor from '@coral-xyz/anchor';
+const { AnchorProvider } = anchor;
 import { BaseService, BaseServiceConfig } from './base.js';
 import { IPFSService, IPFSStorageResult } from './ipfs.js';
 import { Transaction, TransactionInstruction, PublicKey, Connection } from '@solana/web3.js';

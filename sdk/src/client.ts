@@ -1,5 +1,6 @@
 import { Connection, PublicKey, Signer, Commitment } from "@solana/web3.js";
-import anchor, { Program, AnchorProvider } from "@coral-xyz/anchor";
+import anchor from "@coral-xyz/anchor";
+const { Program, AnchorProvider } = anchor;
 import {
   PROGRAM_ID,
   PodComConfig,

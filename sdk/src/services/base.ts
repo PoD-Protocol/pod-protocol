@@ -1,5 +1,6 @@
 import { Connection, PublicKey, Commitment } from "@solana/web3.js";
-import { Program } from "@coral-xyz/anchor";
+import anchor from "@coral-xyz/anchor";
+const { Program } = anchor;
 type AnchorProgram = Program<any>;
 
 /**

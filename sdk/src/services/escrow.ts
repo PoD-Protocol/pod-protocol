@@ -1,5 +1,6 @@
 import { PublicKey, Signer, SystemProgram } from "@solana/web3.js";
-import { BN } from "@coral-xyz/anchor";
+import anchor from "@coral-xyz/anchor";
+const { BN } = anchor;
 import { BaseService } from "./base";
 import {
   DepositEscrowOptions,
