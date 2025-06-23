@@ -213,6 +213,9 @@ echo "PHOTON_INDEXER_URL=https://devnet.helius-rpc.com" >> .env
 echo "ENABLE_ZK_COMPRESSION=true" >> .env
 ```
 
+Set `PHOTON_INDEXER_URL` to the URL of your Photon indexer. If this variable is
+not set, the CLI falls back to `https://mainnet.helius-rpc.com`.
+
 ### Custom Light Protocol Addresses
 
 You can override the default Light Protocol RPC URLs and program IDs using environment variables:

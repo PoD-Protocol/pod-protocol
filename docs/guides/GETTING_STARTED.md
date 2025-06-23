@@ -44,6 +44,8 @@ solana airdrop 2   # Get some SOL for testing
 ```bash
 cp .env.example .env
 # Edit .env with your preferred settings
+# Set PHOTON_INDEXER_URL to your Photon indexer endpoint
+# (defaults to https://mainnet.helius-rpc.com if unset)
 ```
 
 ## Basic Usage

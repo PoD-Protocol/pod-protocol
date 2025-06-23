@@ -437,7 +437,11 @@ export function createZKCompressionCommand(): Command {
   configCmd
     .command('indexer')
     .description('Configure Photon indexer connection')
-    .option('--url <url>', 'Indexer API URL', 'http://localhost:8080')
+    .option(
+      '--url <url>',
+      'Indexer API URL',
+      process.env.PHOTON_INDEXER_URL || 'https://mainnet.helius-rpc.com'
+    )
     .option('--test', 'Test indexer connection')
     .action(async (options) => {
       try {
