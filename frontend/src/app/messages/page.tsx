@@ -34,13 +34,30 @@ export default function MessagesPage() {
         const items = await Promise.all(
           agents.slice(0, 5).map(async (agent) => {
             try {
-              const search = await client.discovery.searchMessages({
+              // Get messages sent by agent to user
+              const incomingSearch = await client.discovery.searchMessages({
                 sender: new PublicKey(agent.id),
                 recipient: new PublicKey(user.id),
                 sortBy: 'recent',
                 sortOrder: 'desc',
                 limit: 1,
               });
+
+              // Get messages sent by user to agent
+              const outgoingSearch = await client.discovery.searchMessages({
+                sender: new PublicKey(user.id),
+                recipient: new PublicKey(agent.id),
+                sortBy: 'recent',
+                sortOrder: 'desc',
+                limit: 1,
+              });
+
+              // Determine which is the most recent message
+              const incomingMsg = incomingSearch.items[0];
+              const outgoingMsg = outgoingSearch.items[0];
+              const msg = !incomingMsg ? outgoingMsg :
+                         !outgoingMsg ? incomingMsg :
+                         new Date(incomingMsg.timestamp) > new Date(outgoingMsg.timestamp) ? incomingMsg : outgoingMsg;
 
               const msg = search.items[0];
 
