@@ -128,7 +128,12 @@ export class ZKCompressionService extends BaseService {
   private config: ZKCompressionConfig;
   private rpc: Rpc;
   private ipfsService: IPFSService;
-  private batchQueue: CompressedChannelMessage[] = [];
+  private batchQueue: {
+    message: CompressedChannelMessage;
+    ipfs: IPFSStorageResult;
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
+  }[] = [];
   private batchTimer?: NodeJS.Timeout;
   private lastBatchResult?: { signature: string; compressedAccounts: any[] };
 
@@ -275,49 +280,17 @@ export class ZKCompressionService extends BaseService {
       };
 
       if (this.config.enableBatching) {
-        // Add to batch queue
-        this.batchQueue.push(compressedMessage);
-        
-        if (this.batchQueue.length >= this.config.maxBatchSize) {
-          return await this.processBatch(wallet);
-        }
-
-        // Return promise that resolves when batch is processed
         return new Promise((resolve, reject) => {
-          const checkBatch = () => {
-            // Check if message was processed in a batch
-            const processedIndex = this.batchQueue.findIndex(
-              msg => msg.contentHash === compressedMessage.contentHash
-            );
-            
-            if (processedIndex === -1) {
-              // Message was processed, return success
-              const batchResult = this.lastBatchResult || {
-                signature: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                compressedAccounts: []
-              };
-              
-              resolve({
-                signature: batchResult.signature,
-                ipfsResult,
-                compressedAccount: { 
-                  hash: compressedMessage.contentHash, 
-                  data: compressedMessage 
-                },
-              });
-            } else {
-              // Still in queue, check again after timeout
-              setTimeout(checkBatch, 100);
-            }
-          };
-          
-          // Start checking after a short delay
-          setTimeout(checkBatch, 50);
-          
-          // Timeout after 30 seconds
-          setTimeout(() => {
-            reject(new Error('Batch processing timeout'));
-          }, 30000);
+          this.batchQueue.push({
+            message: compressedMessage,
+            ipfs: ipfsResult,
+            resolve,
+            reject,
+          });
+
+          if (this.batchQueue.length >= this.config.maxBatchSize) {
+            this.processBatch(wallet).catch(reject);
+          }
         });
       } else {
         // Execute compression via Light Protocol transaction
@@ -438,46 +411,48 @@ export class ZKCompressionService extends BaseService {
         throw new Error('Batch size too large. Maximum 100 messages per batch.');
       }
 
-      const program = this.ensureInitialized();
       const timestamp = syncTimestamp || Date.now();
 
-      // Convert string hashes to byte arrays
-      const hashBytes = messageHashes.map(hash => 
-        Array.from(Buffer.from(hash, 'hex'))
-      );
+      const [treeInfo] = await this.rpc.getStateTreeInfos();
+      const toAddresses = messageHashes.map(() => channelId);
+      const amounts = messageHashes.map(() => 0);
 
-      // Implement Light Protocol integration
-      const tx = await (program as any).methods
-        .batchSyncCompressedMessages(hashBytes, timestamp)
-        .accounts({
-          channelAccount: channelId,
-          feePayer: wallet.publicKey,
-          authority: wallet.publicKey,
-          lightSystemProgram: this.config.lightSystemProgram,
-          compressedTokenProgram: this.config.compressedTokenProgram,
-          registeredProgramId: this.config.registeredProgramId,
-          noopProgram: this.config.noopProgram,
-          accountCompressionAuthority: this.config.accountCompressionAuthority,
-          accountCompressionProgram: this.config.accountCompressionProgram,
-          merkleTree: channelId,
-          nullifierQueue: this.config.nullifierQueuePubkey,
-        cpiAuthorityPda: this.config.cpiAuthorityPda,
-        })
-        .transaction();
+      const instruction = await CompressedTokenProgram.compress({
+        payer: wallet.publicKey,
+        owner: wallet.publicKey,
+        source: wallet.publicKey,
+        toAddress: toAddresses,
+        amount: amounts,
+        mint: this.config.compressedTokenMint,
+        outputStateTreeInfo: treeInfo,
+        tokenPoolInfo: null,
+      });
 
-      const provider = program.provider as AnchorProvider;
+      const transaction = new Transaction().add(instruction);
       let signature: string;
       try {
-        signature = await provider.sendAndConfirm(tx);
+        signature = await this.rpc.sendTransaction(transaction, []);
       } catch (err) {
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
-      return {
-        signature,
-        compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
-      };
+      let compressedAccounts: CompressedAccount[] = [];
+      let merkleRoot = '';
+      try {
+        const txInfo = await this.rpc.getTransactionWithCompressionInfo(signature);
+        if (txInfo?.compressionInfo) {
+          merkleRoot = txInfo.compressionInfo.roots?.[0]?.toString(16) || '';
+          compressedAccounts = (txInfo.compressionInfo.openedAccounts || []).map((acc, idx) => ({
+            hash: acc.account.hash.toString(16),
+            data: { hash: messageHashes[idx], timestamp },
+            merkleContext: acc.account.merkleContext,
+          }));
+        }
+      } catch (e) {
+        // ignore parsing errors
+      }
+
+      return { signature, compressedAccounts, merkleRoot };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);
     }
@@ -673,7 +648,7 @@ export class ZKCompressionService extends BaseService {
   /**
    * Private: Process the current batch
    */
-  private async processBatch(wallet: any): Promise<any> {
+  private async processBatch(wallet: any): Promise<BatchCompressionResult | null> {
     if (this.batchQueue.length === 0) {
       return null;
     }
@@ -683,7 +658,7 @@ export class ZKCompressionService extends BaseService {
 
     try {
       const [treeInfo] = await this.rpc.getStateTreeInfos();
-      const toAddresses = batch.map((m) => m.channel);
+      const toAddresses = batch.map((b) => b.message.channel);
       const amounts = batch.map(() => 0);
 
       const instruction = await CompressedTokenProgram.compress({
@@ -692,7 +667,7 @@ export class ZKCompressionService extends BaseService {
         source: wallet.publicKey,
         toAddress: toAddresses,
         amount: amounts,
-        mint: this.config.compressedTokenMint, // Use the correct mint address
+        mint: this.config.compressedTokenMint,
         outputStateTreeInfo: treeInfo,
         tokenPoolInfo: null,
       });
@@ -702,25 +677,45 @@ export class ZKCompressionService extends BaseService {
       try {
         signature = await this.rpc.sendTransaction(transaction, []);
       } catch (err) {
+        batch.forEach((b) => b.reject(err));
         throw new Error(`Light Protocol RPC error: ${err}`);
       }
 
-      const result = {
-        signature,
-        compressedAccounts: batch.map((msg) => ({
-          hash: msg.contentHash,
-          data: msg,
-        })),
-        merkleRoot: '',
-      };
+      let compressedAccounts: CompressedAccount[] = [];
+      let merkleRoot = '';
+      try {
+        const txInfo = await this.rpc.getTransactionWithCompressionInfo(signature);
+        if (txInfo?.compressionInfo) {
+          merkleRoot = txInfo.compressionInfo.roots?.[0]?.toString(16) || '';
+          compressedAccounts = (txInfo.compressionInfo.openedAccounts || []).map((acc, idx) => ({
+            hash: acc.account.hash.toString(16),
+            data: batch[idx]?.message,
+            merkleContext: acc.account.merkleContext,
+          }));
+        }
+      } catch (e) {
+        // If fetching transaction info fails, continue with minimal info
+      }
+
+      const result = { signature, compressedAccounts, merkleRoot };
 
       this.lastBatchResult = {
         signature: result.signature,
         compressedAccounts: result.compressedAccounts,
       };
 
+      batch.forEach((b, idx) => {
+        const account = result.compressedAccounts[idx] || { hash: b.message.contentHash, data: b.message };
+        b.resolve({
+          signature: result.signature,
+          ipfsResult: b.ipfs,
+          compressedAccount: account,
+        });
+      });
+
       return result;
     } catch (error) {
+      batch.forEach((b) => b.reject(error));
       throw new Error(`Failed batch compression: ${error}`);
     }
   }
