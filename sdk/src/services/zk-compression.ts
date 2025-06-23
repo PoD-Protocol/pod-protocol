@@ -1,10 +1,19 @@
-import { AnchorProvider } from '@coral-xyz/anchor';
-import { BaseService, BaseServiceConfig } from './base.js';
-import { IPFSService, IPFSStorageResult } from './ipfs.js';
-import { Transaction, TransactionInstruction, PublicKey, Connection } from '@solana/web3.js';
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { BaseService, BaseServiceConfig } from "./base.js";
+import { IPFSService, IPFSStorageResult } from "./ipfs.js";
+import {
+  Transaction,
+  TransactionInstruction,
+  PublicKey,
+  Connection,
+} from "@solana/web3.js";
 
-import { createRpc, LightSystemProgram, Rpc } from '@lightprotocol/stateless.js';
-import { createMint, mintTo, transfer } from '@lightprotocol/compressed-token';
+import {
+  createRpc,
+  LightSystemProgram,
+  Rpc,
+} from "@lightprotocol/stateless.js";
+import { createMint, mintTo, transfer } from "@lightprotocol/compressed-token";
 
 /**
  * Compressed account information returned by Light Protocol
@@ -111,28 +120,42 @@ export class ZKCompressionService extends BaseService {
     baseConfig: BaseServiceConfig,
     zkConfig: Partial<ZKCompressionConfig> = {},
     ipfsService: IPFSService,
-    private wallet?: any
+    private wallet?: any,
   ) {
     super(baseConfig);
-    
+
     this.config = {
-      lightRpcUrl: zkConfig.lightRpcUrl || 'https://devnet.helius-rpc.com/?api-key=<your-api-key>',
-      compressionRpcUrl: zkConfig.compressionRpcUrl || zkConfig.lightRpcUrl || 'https://devnet.helius-rpc.com/?api-key=<your-api-key>',
-      proverUrl: zkConfig.proverUrl || zkConfig.lightRpcUrl || 'https://devnet.helius-rpc.com/?api-key=<your-api-key>',
-      photonIndexerUrl: zkConfig.photonIndexerUrl || 'http://localhost:8080',
+      lightRpcUrl:
+        zkConfig.lightRpcUrl ||
+        "https://devnet.helius-rpc.com/?api-key=<your-api-key>",
+      compressionRpcUrl:
+        zkConfig.compressionRpcUrl ||
+        zkConfig.lightRpcUrl ||
+        "https://devnet.helius-rpc.com/?api-key=<your-api-key>",
+      proverUrl:
+        zkConfig.proverUrl ||
+        zkConfig.lightRpcUrl ||
+        "https://devnet.helius-rpc.com/?api-key=<your-api-key>",
+      photonIndexerUrl: zkConfig.photonIndexerUrl || "http://localhost:8080",
       maxBatchSize: zkConfig.maxBatchSize || 50,
       enableBatching: zkConfig.enableBatching ?? true,
       batchTimeout: zkConfig.batchTimeout || 5000,
       // Default Light Protocol program addresses for devnet
-      lightSystemProgram: zkConfig.lightSystemProgram || new PublicKey('H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN'),
-      nullifierQueuePubkey: zkConfig.nullifierQueuePubkey || new PublicKey('nuLLiQHXWLbjy4uxg4R8UuXsJV4JTxvUYm8rqVn8BBc'),
-      cpiAuthorityPda: zkConfig.cpiAuthorityPda || new PublicKey('5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1'),
+      lightSystemProgram:
+        zkConfig.lightSystemProgram ||
+        new PublicKey("H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN"),
+      nullifierQueuePubkey:
+        zkConfig.nullifierQueuePubkey ||
+        new PublicKey("nuLLiQHXWLbjy4uxg4R8UuXsJV4JTxvUYm8rqVn8BBc"),
+      cpiAuthorityPda:
+        zkConfig.cpiAuthorityPda ||
+        new PublicKey("5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1"),
     };
 
     this.rpc = createRpc(
       this.config.lightRpcUrl,
       this.config.compressionRpcUrl, // Use compression endpoint
-      this.config.proverUrl  // Use prover endpoint
+      this.config.proverUrl, // Use prover endpoint
     );
 
     this.ipfsService = ipfsService;
@@ -149,10 +172,10 @@ export class ZKCompressionService extends BaseService {
     channelId: PublicKey,
     content: string,
     wallet: any,
-    messageType: string = 'Text',
+    messageType: string = "Text",
     attachments: string[] = [],
     metadata: Record<string, any> = {},
-    replyTo?: PublicKey
+    replyTo?: PublicKey,
   ): Promise<{
     signature: string;
     ipfsResult: IPFSStorageResult;
@@ -163,7 +186,7 @@ export class ZKCompressionService extends BaseService {
       const ipfsResult = await this.ipfsService.storeMessageContent(
         content,
         attachments,
-        metadata
+        metadata,
       );
 
       // Create content hash for on-chain verification
@@ -183,9 +206,17 @@ export class ZKCompressionService extends BaseService {
       if (this.config.enableBatching) {
         // Add to batch queue
         this.batchQueue.push(compressedMessage);
-        
+
         if (this.batchQueue.length >= this.config.maxBatchSize) {
-          return await this.processBatch(wallet);
+          const batchRes = await this.processBatch(wallet);
+          const account = batchRes.compressedAccounts.find(
+            (a) => a.hash === compressedMessage.contentHash,
+          ) || { hash: compressedMessage.contentHash, data: compressedMessage };
+          return {
+            signature: batchRes.signature,
+            ipfsResult,
+            compressedAccount: account,
+          };
         }
 
         // Return promise that resolves when batch is processed
@@ -193,22 +224,22 @@ export class ZKCompressionService extends BaseService {
           const checkBatch = () => {
             // Check if message was processed in a batch
             const processedIndex = this.batchQueue.findIndex(
-              msg => msg.contentHash === compressedMessage.contentHash
+              (msg) => msg.contentHash === compressedMessage.contentHash,
             );
-            
+
             if (processedIndex === -1) {
               // Message was processed, return success
               const batchResult = this.lastBatchResult || {
                 signature: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                compressedAccounts: []
+                compressedAccounts: [],
               };
-              
+
               resolve({
                 signature: batchResult.signature,
                 ipfsResult,
-                compressedAccount: { 
-                  hash: compressedMessage.contentHash, 
-                  data: compressedMessage 
+                compressedAccount: {
+                  hash: compressedMessage.contentHash,
+                  data: compressedMessage,
                 },
               });
             } else {
@@ -216,18 +247,22 @@ export class ZKCompressionService extends BaseService {
               setTimeout(checkBatch, 100);
             }
           };
-          
+
           // Start checking after a short delay
           setTimeout(checkBatch, 50);
-          
+
           // Timeout after 30 seconds
           setTimeout(() => {
-            reject(new Error('Batch processing timeout'));
+            reject(new Error("Batch processing timeout"));
           }, 30000);
         });
       } else {
         // Execute compression via Light Protocol transaction
-        const instruction = await this.createCompressionInstruction(channelId, compressedMessage, wallet.publicKey);
+        const instruction = await this.createCompressionInstruction(
+          channelId,
+          compressedMessage,
+          wallet.publicKey,
+        );
         const transaction = new Transaction().add(instruction);
         const signature = await this.rpc.sendTransaction(transaction, []);
 
@@ -254,7 +289,7 @@ export class ZKCompressionService extends BaseService {
     wallet: any,
     displayName?: string,
     avatar?: string,
-    permissions: string[] = []
+    permissions: string[] = [],
   ): Promise<{
     signature: string;
     ipfsResult?: IPFSStorageResult;
@@ -262,14 +297,14 @@ export class ZKCompressionService extends BaseService {
   }> {
     try {
       let ipfsResult: IPFSStorageResult | undefined;
-      let metadataHash = '';
+      let metadataHash = "";
 
       // Store extended metadata on IPFS if provided
       if (displayName || avatar || permissions.length > 0) {
         ipfsResult = await this.ipfsService.storeParticipantMetadata(
-          displayName || '',
+          displayName || "",
           avatar,
-          permissions
+          permissions,
         );
         metadataHash = ipfsResult.hash;
       }
@@ -286,10 +321,10 @@ export class ZKCompressionService extends BaseService {
 
       // Create transaction using Light Protocol
       const program = this.ensureInitialized();
-      
+
       // Create Light Protocol compressed account transaction
       const tx = await (program as any).methods
-        .joinChannelCompressed(Array.from(Buffer.from(metadataHash, 'hex')))
+        .joinChannelCompressed(Array.from(Buffer.from(metadataHash, "hex")))
         .accounts({
           channelAccount: channelId,
           agentAccount: participantId,
@@ -297,13 +332,21 @@ export class ZKCompressionService extends BaseService {
           feePayer: wallet.publicKey,
           authority: wallet.publicKey,
           lightSystemProgram: this.config.lightSystemProgram,
-          registeredProgramId: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          noopProgram: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          accountCompressionAuthority: new PublicKey('5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW'),
-          accountCompressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+          registeredProgramId: new PublicKey(
+            "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+          ),
+          noopProgram: new PublicKey(
+            "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+          ),
+          accountCompressionAuthority: new PublicKey(
+            "5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW",
+          ),
+          accountCompressionProgram: new PublicKey(
+            "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK",
+          ),
           merkleTree: channelId, // Use channel as merkle tree
           nullifierQueue: this.config.nullifierQueuePubkey,
-        cpiAuthorityPda: this.config.cpiAuthorityPda,
+          cpiAuthorityPda: this.config.cpiAuthorityPda,
         })
         .transaction();
 
@@ -313,7 +356,7 @@ export class ZKCompressionService extends BaseService {
       return {
         signature,
         ipfsResult,
-        compressedAccount: { hash: '', data: compressedParticipant },
+        compressedAccount: { hash: "", data: compressedParticipant },
       };
     } catch (error) {
       throw new Error(`Failed to join channel with compression: ${error}`);
@@ -327,19 +370,21 @@ export class ZKCompressionService extends BaseService {
     channelId: PublicKey,
     messageHashes: string[],
     wallet: any,
-    syncTimestamp?: number
+    syncTimestamp?: number,
   ): Promise<BatchCompressionResult> {
     try {
       if (messageHashes.length > 100) {
-        throw new Error('Batch size too large. Maximum 100 messages per batch.');
+        throw new Error(
+          "Batch size too large. Maximum 100 messages per batch.",
+        );
       }
 
       const program = this.ensureInitialized();
       const timestamp = syncTimestamp || Date.now();
 
       // Convert string hashes to byte arrays
-      const hashBytes = messageHashes.map(hash => 
-        Array.from(Buffer.from(hash, 'hex'))
+      const hashBytes = messageHashes.map((hash) =>
+        Array.from(Buffer.from(hash, "hex")),
       );
 
       // Implement Light Protocol integration
@@ -349,15 +394,27 @@ export class ZKCompressionService extends BaseService {
           channelAccount: channelId,
           feePayer: wallet.publicKey,
           authority: wallet.publicKey,
-          lightSystemProgram: new PublicKey('H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN'),
-          compressedTokenProgram: new PublicKey('cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m'),
-          registeredProgramId: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          noopProgram: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          accountCompressionAuthority: new PublicKey('5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW'),
-          accountCompressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+          lightSystemProgram: new PublicKey(
+            "H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN",
+          ),
+          compressedTokenProgram: new PublicKey(
+            "cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m",
+          ),
+          registeredProgramId: new PublicKey(
+            "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+          ),
+          noopProgram: new PublicKey(
+            "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+          ),
+          accountCompressionAuthority: new PublicKey(
+            "5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW",
+          ),
+          accountCompressionProgram: new PublicKey(
+            "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK",
+          ),
           merkleTree: channelId,
           nullifierQueue: this.config.nullifierQueuePubkey,
-        cpiAuthorityPda: this.config.cpiAuthorityPda,
+          cpiAuthorityPda: this.config.cpiAuthorityPda,
         })
         .transaction();
 
@@ -367,7 +424,7 @@ export class ZKCompressionService extends BaseService {
       return {
         signature,
         compressedAccounts: [], // Would be populated from Light Protocol response
-        merkleRoot: '', // Would be populated from Light Protocol response
+        merkleRoot: "", // Would be populated from Light Protocol response
       };
     } catch (error) {
       throw new Error(`Failed to batch sync messages: ${error}`);
@@ -385,14 +442,14 @@ export class ZKCompressionService extends BaseService {
       sender?: PublicKey;
       after?: Date;
       before?: Date;
-    } = {}
+    } = {},
   ): Promise<CompressedChannelMessage[]> {
     try {
       // Query compressed messages via Photon indexer JSON-RPC
       const rpcReq = {
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         id: Date.now(),
-        method: 'getCompressedMessagesByChannel',
+        method: "getCompressedMessagesByChannel",
         params: [
           channelId.toString(),
           options.limit ?? 50,
@@ -403,19 +460,24 @@ export class ZKCompressionService extends BaseService {
         ],
       };
       const response = await fetch(this.config.photonIndexerUrl!, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rpcReq),
       });
       if (!response.ok) {
         throw new Error(`Indexer RPC failed: ${response.statusText}`);
       }
-      const json = await response.json() as { result?: any[], error?: { message?: string } };
+      const json = (await response.json()) as {
+        result?: any[];
+        error?: { message?: string };
+      };
       if (json.error) {
-        throw new Error(`Indexer RPC error: ${json.error?.message || 'Unknown error'}`);
+        throw new Error(
+          `Indexer RPC error: ${json.error?.message || "Unknown error"}`,
+        );
       }
       const raw = json.result || [];
-      return raw.map(m => ({
+      return raw.map((m) => ({
         channel: new PublicKey(m.channel),
         sender: new PublicKey(m.sender),
         contentHash: m.content_hash,
@@ -441,19 +503,19 @@ export class ZKCompressionService extends BaseService {
   }> {
     try {
       const response = await fetch(
-        `${this.config.photonIndexerUrl}/channel-stats/${channelId.toString()}`
+        `${this.config.photonIndexerUrl}/channel-stats/${channelId.toString()}`,
       );
 
       if (!response.ok) {
         throw new Error(`Stats query failed: ${response.statusText}`);
       }
 
-      const data = await response.json() as any;
+      const data = (await response.json()) as any;
       return {
         totalMessages: data.totalMessages || 0,
         totalParticipants: data.totalParticipants || 0,
         storageSize: data.storageSize || 0,
-        compressionRatio: data.compressionRatio || 1.0
+        compressionRatio: data.compressionRatio || 1.0,
       };
     } catch (error) {
       throw new Error(`Failed to get channel stats: ${error}`);
@@ -464,19 +526,23 @@ export class ZKCompressionService extends BaseService {
    * Retrieve message content from IPFS and verify against on-chain hash
    */
   async getMessageContent(
-    compressedMessage: CompressedChannelMessage
+    compressedMessage: CompressedChannelMessage,
   ): Promise<{
     content: any;
     verified: boolean;
   }> {
     try {
-      const content = await this.ipfsService.retrieveMessageContent(compressedMessage.ipfsHash);
+      const content = await this.ipfsService.retrieveMessageContent(
+        compressedMessage.ipfsHash,
+      );
       const computedHash = IPFSService.createContentHash(content.content);
       const verified = computedHash === compressedMessage.contentHash;
 
       return { content, verified };
     } catch (error) {
-      throw new Error(`Failed to retrieve and verify message content: ${error}`);
+      throw new Error(
+        `Failed to retrieve and verify message content: ${error}`,
+      );
     }
   }
 
@@ -513,33 +579,45 @@ export class ZKCompressionService extends BaseService {
   private async processCompressedMessage(
     message: CompressedChannelMessage,
     ipfsResult: IPFSStorageResult,
-    wallet: any
+    wallet: any,
   ): Promise<any> {
     try {
       const program = this.ensureInitialized();
-      
+
       // Implement Light Protocol integration
       const tx = await (program as any).methods
         .broadcastMessageCompressed(
           message.contentHash, // Use content hash instead of full content
           message.messageType,
           message.replyTo || null,
-          message.ipfsHash
+          message.ipfsHash,
         )
         .accounts({
           channelAccount: message.channel,
           participantAccount: message.sender,
           feePayer: wallet.publicKey,
           authority: wallet.publicKey,
-          lightSystemProgram: new PublicKey('H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN'),
-          compressedTokenProgram: new PublicKey('cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m'),
-          registeredProgramId: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          noopProgram: new PublicKey('noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV'),
-          accountCompressionAuthority: new PublicKey('5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW'),
-          accountCompressionProgram: new PublicKey('cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK'),
+          lightSystemProgram: new PublicKey(
+            "H5sFv8VwWmjxHYS2GB4fTDsK7uTtnRT4WiixtHrET3bN",
+          ),
+          compressedTokenProgram: new PublicKey(
+            "cTokenmWW8bLPjZEBAUgYy3zKxQZW6VKi7bqNFEVv3m",
+          ),
+          registeredProgramId: new PublicKey(
+            "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+          ),
+          noopProgram: new PublicKey(
+            "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV",
+          ),
+          accountCompressionAuthority: new PublicKey(
+            "5QPEJ5zDsVou9FQS3KCHdPeeWDfWDcXYRKZaAkXRBGSW",
+          ),
+          accountCompressionProgram: new PublicKey(
+            "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK",
+          ),
           merkleTree: message.channel,
           nullifierQueue: this.config.nullifierQueuePubkey,
-        cpiAuthorityPda: this.config.cpiAuthorityPda,
+          cpiAuthorityPda: this.config.cpiAuthorityPda,
         })
         .transaction();
 
@@ -549,7 +627,7 @@ export class ZKCompressionService extends BaseService {
       return {
         signature,
         ipfsResult,
-        compressedAccount: { hash: '', data: message },
+        compressedAccount: { hash: "", data: message },
       };
     } catch (error) {
       throw new Error(`Failed to process compressed message: ${error}`);
@@ -559,51 +637,56 @@ export class ZKCompressionService extends BaseService {
   /**
    * Private: Process the current batch
    */
-  private async processBatch(wallet: any): Promise<any> {
+  private async processBatch(wallet: any): Promise<BatchCompressionResult> {
     if (this.batchQueue.length === 0) {
-      return null;
+      return {
+        signature: "",
+        compressedAccounts: [],
+        merkleRoot: "",
+      };
     }
 
     const batch = [...this.batchQueue];
     this.batchQueue = [];
 
-    // Process batch using Light Protocol's batch compression
-    // This would involve creating a batch transaction with multiple compressed accounts
-    
-    // Execute batch compression via Light Protocol transactions
-    const compressedAccounts = [];
-    let lastSignature = '';
-    
+    const instructions: TransactionInstruction[] = [];
     for (const msg of batch) {
-      const instruction = await this.createCompressionInstruction(msg.channel, msg, wallet.publicKey);
-      const transaction = new Transaction().add(instruction);
-      const signature = await this.rpc.sendTransaction(transaction, []);
-      
-      compressedAccounts.push({
-        hash: msg.contentHash,
-        data: msg,
-      });
-      
-      lastSignature = signature;
+      const ix = await this.createCompressionInstruction(
+        msg.channel,
+        msg,
+        wallet.publicKey,
+      );
+      instructions.push(ix);
     }
-    
-    const rpcResult = {
-      signature: lastSignature,
+
+    const transaction = new Transaction();
+    for (const ix of instructions) {
+      transaction.add(ix);
+    }
+
+    const signature = await this.rpc.sendTransaction(transaction, []);
+
+    const compressedAccounts = batch.map((msg) => ({
+      hash: msg.contentHash,
+      data: msg,
+    }));
+
+    const merkleRoot = IPFSService.createContentHash(
+      batch.map((m) => m.contentHash).join(""),
+    );
+
+    const result: BatchCompressionResult = {
+      signature,
       compressedAccounts,
-      merkleRoot: '',
+      merkleRoot,
     };
-    const result = {
-      signature: rpcResult.signature,
-      compressedAccounts: rpcResult.compressedAccounts,
-      merkleRoot: rpcResult.merkleRoot,
-    };
-    
+
     // Store the result for pending batch promises
     this.lastBatchResult = {
       signature: result.signature,
-      compressedAccounts: result.compressedAccounts
+      compressedAccounts: result.compressedAccounts,
     };
-    
+
     return result;
   }
 
@@ -629,11 +712,11 @@ export class ZKCompressionService extends BaseService {
   private async createCompressionInstruction(
     merkleTree: PublicKey,
     message: CompressedChannelMessage,
-    authority: PublicKey
+    authority: PublicKey,
   ): Promise<TransactionInstruction> {
     // Create a simple transaction instruction for compression
     // This is a placeholder implementation that should be replaced with actual Light Protocol integration
-    const { SystemProgram } = await import('@solana/web3.js');
+    const { SystemProgram } = await import("@solana/web3.js");
     return SystemProgram.transfer({
       fromPubkey: authority,
       toPubkey: merkleTree,
