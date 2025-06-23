@@ -6,8 +6,9 @@ use anchor_lang::solana_program::pubkey::Pubkey;
 
 // Light Protocol ZK Compression imports
 use light_compressed_token::program::LightCompressedToken;
-use light_system_program::program::LightSystemProgram;
 use light_hasher::{hash_to_bn254_field_size_be, LightHasher};
+use light_system_program::program::LightSystemProgram;
+use zeroize::Zeroize;
 
 declare_id!("HEpGLgYsE1kP8aoYKyLFc3JVVrofS7T4zEA6fWBJsZps");
 
@@ -298,25 +299,25 @@ pub struct MessageAccount {
 // Compressed Channel Message - stores only essential data on-chain, content via IPFS
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, LightHasher)]
 pub struct CompressedChannelMessage {
-    pub channel: Pubkey,           // 32 bytes
-    pub sender: Pubkey,            // 32 bytes
+    pub channel: Pubkey, // 32 bytes
+    pub sender: Pubkey,  // 32 bytes
     #[hash]
-    pub content_hash: [u8; 32],    // 32 bytes - SHA256 hash of IPFS content
-    pub ipfs_hash: String,         // 4 + 64 bytes - IPFS content identifier
+    pub content_hash: [u8; 32], // 32 bytes - SHA256 hash of IPFS content
+    pub ipfs_hash: String, // 4 + 64 bytes - IPFS content identifier
     pub message_type: MessageType, // 1 byte
-    pub created_at: i64,           // 8 bytes
-    pub edited_at: Option<i64>,    // 9 bytes
-    pub reply_to: Option<Pubkey>,  // 33 bytes
+    pub created_at: i64, // 8 bytes
+    pub edited_at: Option<i64>, // 9 bytes
+    pub reply_to: Option<Pubkey>, // 33 bytes
 }
 
 // Compressed Channel Participant - minimal on-chain footprint
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, LightHasher)]
 pub struct CompressedChannelParticipant {
-    pub channel: Pubkey,         // 32 bytes
-    pub participant: Pubkey,     // 32 bytes
-    pub joined_at: i64,          // 8 bytes
-    pub messages_sent: u64,      // 8 bytes
-    pub last_message_at: i64,    // 8 bytes
+    pub channel: Pubkey,      // 32 bytes
+    pub participant: Pubkey,  // 32 bytes
+    pub joined_at: i64,       // 8 bytes
+    pub messages_sent: u64,   // 8 bytes
+    pub last_message_at: i64, // 8 bytes
     #[hash]
     pub metadata_hash: [u8; 32], // 32 bytes - Hash of extended metadata in IPFS
 }
@@ -966,8 +967,11 @@ pub mod pod_com {
         }
         participant.last_message_at = current_time;
 
-        // Create content hash
-        let (content_hash, _) = hash_to_bn254_field_size_be(&content.as_bytes()).unwrap();
+        // Create content hash and clear the message bytes afterwards
+        let mut content_bytes = content.into_bytes();
+        let (content_hash, _) = hash_to_bn254_field_size_be(&content_bytes).unwrap();
+        // Zeroize sensitive message bytes after hashing
+        content_bytes.zeroize();
 
         // Create compressed message data
         let compressed_message = CompressedChannelMessage {
@@ -982,7 +986,7 @@ pub mod pod_com {
         };
 
         // Compress the account using Light Protocol
-        let compressed_account_data = borsh::to_vec(&compressed_message)?;
+        let mut compressed_account_data = borsh::to_vec(&compressed_message)?;
 
         let cpi_accounts = CompressAccount {
             fee_payer: ctx.accounts.fee_payer.to_account_info(),
@@ -1003,7 +1007,9 @@ pub mod pod_com {
             ctx.accounts.light_system_program.to_account_info(),
             cpi_accounts,
         );
-        compress_account(cpi_ctx, compressed_account_data, None)?;
+        compress_account(cpi_ctx, compressed_account_data.clone(), None)?;
+        // Zeroize message buffer after compression
+        compressed_account_data.zeroize();
 
         // Emit event for indexing
         emit!(MessageBroadcast {
@@ -1054,8 +1060,8 @@ pub mod pod_com {
             }
         }
 
-        // Use provided metadata_hash for participant compression
-        let metadata_hash = metadata_hash;
+        // Use provided metadata_hash for participant compression and clear it after use
+        let mut metadata_hash_buf = metadata_hash;
 
         let compressed_participant = CompressedChannelParticipant {
             channel: channel.key(),
@@ -1063,11 +1069,11 @@ pub mod pod_com {
             joined_at: clock.unix_timestamp,
             messages_sent: 0,
             last_message_at: 0,
-            metadata_hash,
+            metadata_hash: metadata_hash_buf,
         };
 
         // Compress the participant account
-        let compressed_account_data = borsh::to_vec(&compressed_participant)?;
+        let mut compressed_account_data = borsh::to_vec(&compressed_participant)?;
 
         let cpi_accounts = CompressAccount {
             fee_payer: ctx.accounts.fee_payer.to_account_info(),
@@ -1088,7 +1094,10 @@ pub mod pod_com {
             ctx.accounts.light_system_program.to_account_info(),
             cpi_accounts,
         );
-        compress_account(cpi_ctx, compressed_account_data, None)?;
+        compress_account(cpi_ctx, compressed_account_data.clone(), None)?;
+        // Zeroize sensitive buffers after compression
+        compressed_account_data.zeroize();
+        metadata_hash_buf.zeroize();
 
         // Update channel participant count
         channel.current_participants += 1;
