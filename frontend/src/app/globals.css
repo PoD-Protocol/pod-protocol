@@ -57,7 +57,7 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-pod-violet rounded;
+    @apply bg-pod-violet rounded-md;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
