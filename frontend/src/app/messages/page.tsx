@@ -161,17 +161,29 @@ export default function MessagesPage() {
       reactions: [] as Message["reactions"],
     };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      console.error("Message sending timed out");
+      addMessage(channelId, { ...baseMessage, status: MessageStatus.FAILED });
+    }, 10000); // 10 second timeout
+
     try {
       await client.messages.sendMessage(wallet, {
         recipient: new PublicKey(selectedAgent.id),
         payload: newMessage,
         messageType: MessageType.TEXT,
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
       addMessage(channelId, { ...baseMessage, status: MessageStatus.SENT });
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error("Failed to send message", err);
-      addMessage(channelId, { ...baseMessage, status: MessageStatus.FAILED });
+      if (!controller.signal.aborted) {
+        addMessage(channelId, { ...baseMessage, status: MessageStatus.FAILED });
+      }
     }
 
     setNewMessage("");
